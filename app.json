@@ -39,6 +39,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": "https://rork.com/"
+      },
+      "eas": {
+        "projectId": "a6ed7f46-06b6-4940-b6e2-d65aeb0a20ba"
+      }
+    },
+    "owner": "brayan-chan"
   }
 }
