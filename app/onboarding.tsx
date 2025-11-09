@@ -13,15 +13,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowRight, Target, Zap } from 'lucide-react-native';
+import { ArrowRight, Target, Zap, Globe2 } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
+import LanguageSelector from '@/components/LanguageSelector';
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const { saveIdentity } = useApp();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const [currentIdentity, setCurrentIdentity] = useState('');
   const [targetIdentity, setTargetIdentity] = useState('');
   const [whyTransform, setWhyTransform] = useState('');
@@ -38,25 +42,25 @@ export default function OnboardingScreen() {
 
   const steps = [
     {
-      title: 'Who are you now?',
-      subtitle: 'Be honest. No judgment.',
-      placeholder: 'e.g., Procrastinator who scrolls 4h/day...',
+      title: t('onboarding.whoAreYou'),
+      subtitle: t('onboarding.whoAreYouSubtitle'),
+      placeholder: t('onboarding.whoAreYouPlaceholder'),
       value: currentIdentity,
       onChange: setCurrentIdentity,
       icon: Target,
     },
     {
-      title: 'Who do you want to become?',
-      subtitle: 'Paint the picture of your best self.',
-      placeholder: 'e.g., Disciplined entrepreneur who executes...',
+      title: t('onboarding.whoDoYouWant'),
+      subtitle: t('onboarding.whoDoYouWantSubtitle'),
+      placeholder: t('onboarding.whoDoYouWantPlaceholder'),
       value: targetIdentity,
       onChange: setTargetIdentity,
       icon: Zap,
     },
     {
-      title: 'Why transform?',
-      subtitle: 'This is your anchor. Make it powerful.',
-      placeholder: 'e.g., Tired of wasting my potential...',
+      title: t('onboarding.whyTransform'),
+      subtitle: t('onboarding.whyTransformSubtitle'),
+      placeholder: t('onboarding.whyTransformPlaceholder'),
       value: whyTransform,
       onChange: setWhyTransform,
       icon: Target,
@@ -91,13 +95,28 @@ export default function OnboardingScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-        <View style={styles.header}>
-          <View style={styles.iconContainer}>
-            <Icon size={32} color={Colors.dark.primary} strokeWidth={2} />
+        <View style={styles.headerContainer}>
+          <View style={styles.header}>
+            <View style={styles.iconContainer}>
+              <Icon size={32} color={Colors.dark.primary} strokeWidth={2} />
+            </View>
+            <Text style={styles.title}>{currentStep.title}</Text>
+            <Text style={styles.subtitle}>{currentStep.subtitle}</Text>
           </View>
-          <Text style={styles.title}>{currentStep.title}</Text>
-          <Text style={styles.subtitle}>{currentStep.subtitle}</Text>
+          
+          <TouchableOpacity
+            style={styles.languageButton}
+            onPress={() => setShowLanguageSelector(!showLanguageSelector)}
+          >
+            <Globe2 size={24} color={Colors.dark.textSecondary} strokeWidth={2} />
+          </TouchableOpacity>
         </View>
+
+        {showLanguageSelector && (
+          <View style={styles.languageSelector}>
+            <LanguageSelector />
+          </View>
+        )}
 
         <View style={styles.content}>
           <TextInput
@@ -138,7 +157,7 @@ export default function OnboardingScreen() {
             disabled={!canProceed}
           >
             <Text style={styles.buttonText}>
-              {step === steps.length - 1 ? 'Begin Transformation' : 'Continue'}
+              {step === steps.length - 1 ? t('onboarding.begin') : t('onboarding.continue')}
             </Text>
             <ArrowRight size={20} color={Colors.dark.text} strokeWidth={2.5} />
           </TouchableOpacity>
@@ -159,8 +178,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 24,
   },
-  header: {
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 48,
+  },
+  header: {
+    flex: 1,
+    marginRight: 16,
+  },
+  languageButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.dark.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  languageSelector: {
+    marginBottom: 24,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 16,
+    padding: 16,
   },
   iconContainer: {
     width: 64,
