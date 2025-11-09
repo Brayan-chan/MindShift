@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Play, Pause, X, AlertCircle } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
 
 const FOCUS_DURATION = 25 * 60 * 1000;
 
 export default function FocusScreen() {
   const { startFocusSession, endFocusSession, addDistraction } = useApp();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const [isActive, setIsActive] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(FOCUS_DURATION);
