@@ -2,10 +2,12 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CheckCircle2, Circle, XCircle } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
 
 export default function HabitsScreen() {
   const { habits, toggleHabit } = useApp();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
 
   const goodHabits = habits.filter(h => h.type === 'good');
