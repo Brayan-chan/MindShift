@@ -1,4 +1,4 @@
-# Welcome to MindShift
+# Welcome to MindShift 🚀
 
 ## Project info
 
