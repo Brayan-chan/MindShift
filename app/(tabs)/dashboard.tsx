@@ -2,10 +2,12 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Flame, TrendingUp, Brain, Clock } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
 
 export default function DashboardScreen() {
   const { identity, habits, currentStreak, totalFocusTime, todaysSessions } = useApp();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
 
   const goodHabitsCompleted = habits.filter(
@@ -25,25 +27,25 @@ export default function DashboardScreen() {
     {
       icon: Flame,
       value: currentStreak,
-      label: 'Day Streak',
+      label: t('dashboard.dayStreak'),
       color: Colors.dark.warning,
     },
     {
       icon: TrendingUp,
       value: `${completionRate}%`,
-      label: 'Today',
+      label: t('dashboard.today'),
       color: Colors.dark.success,
     },
     {
       icon: Clock,
       value: todayFocusMinutes,
-      label: 'Focus Min',
+      label: t('dashboard.focusMin'),
       color: Colors.dark.primary,
     },
     {
       icon: Brain,
       value: focusTimeHours,
-      label: 'Total Hours',
+      label: t('dashboard.totalHours'),
       color: Colors.dark.primary,
     },
   ];
@@ -54,26 +56,26 @@ export default function DashboardScreen() {
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 20 }]}
     >
       <View style={styles.header}>
-        <Text style={styles.greeting}>Your Transformation</Text>
+        <Text style={styles.greeting}>{t('dashboard.transformation')}</Text>
         <Text style={styles.subGreeting}>
-          {identity.targetIdentity || 'Building the best version of yourself'}
+          {identity.targetIdentity || t('dashboard.buildingBest')}
         </Text>
       </View>
 
       <View style={styles.identityCard}>
         <View style={styles.identitySection}>
-          <Text style={styles.identityLabel}>FROM</Text>
+          <Text style={styles.identityLabel}>{t('dashboard.from')}</Text>
           <Text style={styles.identityText} numberOfLines={2}>
-            {identity.currentIdentity || 'Define your starting point'}
+            {identity.currentIdentity || t('dashboard.defineStart')}
           </Text>
         </View>
         <View style={styles.arrowContainer}>
           <View style={styles.arrow} />
         </View>
         <View style={styles.identitySection}>
-          <Text style={[styles.identityLabel, styles.identityLabelTarget]}>TO</Text>
+          <Text style={[styles.identityLabel, styles.identityLabelTarget]}>{t('dashboard.to')}</Text>
           <Text style={[styles.identityText, styles.identityTextTarget]} numberOfLines={2}>
-            {identity.targetIdentity || 'Define your destination'}
+            {identity.targetIdentity || t('dashboard.defineDestination')}
           </Text>
         </View>
       </View>
