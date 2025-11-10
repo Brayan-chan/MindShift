@@ -192,9 +192,13 @@ export const translations = {
     },
     
     dashboard: {
+      transformation: 'Your Transformation',
       greeting: 'Good morning',
       greetingAfternoon: 'Good afternoon',
       greetingEvening: 'Good evening',
+      from: 'FROM',
+      to: 'TO',
+      dayStreak: 'Day Streak',
       todaysFocus: 'Today\'s Focus',
       quickActions: 'Quick Actions',
       startFocus: 'Start Focus Session',
