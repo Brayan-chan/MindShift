@@ -84,6 +84,23 @@ export type WarMode = {
   blockedApps: string[];
 };
 
+export type DailyVideo = {
+  id: string;
+  date: string;
+  videoUrl: string;
+  watched: boolean;
+  watchedAt?: number;
+  duration?: number;
+};
+
+export type RoutineReminderId = 'morning' | 'afternoon' | 'evening' | 'streak';
+
+export type RoutineReminder = {
+  id: RoutineReminderId;
+  enabled: boolean;
+  time: string;
+};
+
 export type Stats = {
   totalFocusTime: number;
   currentStreak: number;
@@ -95,6 +112,8 @@ export type Stats = {
   resistedDistractions: number;
   avgDailyFocusTime: number;
   disciplineScore: number;
+  videosWatched: number;
+  videoStreak: number;
 };
 
 export type UserIdentity = {

@@ -1,54 +1,131 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TrendingUp, Flame, Clock, CheckCircle } from 'lucide-react-native';
-import { useApp } from '@/contexts/AppContext';
+import { TrendingUp, Flame, Clock, CheckCircle, Video, Bell, Zap, Trophy } from 'lucide-react-native';
+import * as Notifications from 'expo-notifications';
+import { DEFAULT_HABIT_TRANSLATION_KEYS, useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
 import LanguageSelector from '@/components/LanguageSelector';
+import RoutineReminderSettings from '@/components/RoutineReminderSettings';
 
 export default function StatsScreen() {
-  const { habits, sessions, currentStreak, totalFocusTime } = useApp();
+  const {
+    habits,
+    sessions,
+    currentStreak,
+    longestStreak,
+    totalFocusTime,
+    dailyVideos,
+    videoStreak,
+    totalXp,
+    level,
+  } = useApp();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
 
-  const completedHabits = habits.filter(h => h.completedToday).length;
-  const totalHabits = habits.length;
+  const testNotification = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        t('stats.notificationUnsupportedTitle'),
+        t('stats.notificationUnsupportedBody')
+      );
+      return;
+    }
+
+    try {
+      // Programar notificación en 5 segundos
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: t('stats.testNotificationTitle'),
+          body: t('stats.testNotificationBody'),
+          data: { type: 'daily-video' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 5
+        },
+      });
+
+      Alert.alert(
+        t('stats.notificationScheduledTitle'),
+        t('stats.notificationScheduledBody'),
+        [{ text: t('common.ok') }]
+      );
+    } catch (error) {
+      Alert.alert(
+        t('common.error'),
+        t('stats.notificationError').replace('{error}', String(error))
+      );
+    }
+  };
+
+  const completedHabits = habits.filter(h => h.type === 'good' && h.completedToday).length;
+  const totalHabits = habits.filter(h => h.type === 'good').length;
   const completionRate = totalHabits > 0 ? Math.round((completedHabits / totalHabits) * 100) : 0;
-  
+
   const totalSessions = sessions.length;
   const completedSessions = sessions.filter(s => s.completed).length;
   const totalDistractions = sessions.reduce((acc, s) => acc + s.distractions, 0);
-  
+
   const focusHours = Math.floor(totalFocusTime / (1000 * 60 * 60));
   const focusMinutes = Math.floor((totalFocusTime % (1000 * 60 * 60)) / (1000 * 60));
 
+  const totalVideosWatched = dailyVideos.filter(v => v.watched).length;
+  const getHabitTitle = (habit: typeof habits[0]) => {
+    const translationKey = DEFAULT_HABIT_TRANSLATION_KEYS[habit.id];
+    return translationKey ? t(translationKey) : habit.title;
+  };
+
   const stats = [
+    {
+      icon: Zap,
+      title: t('gamification.totalXp'),
+      value: totalXp.toString(),
+      subtitle: `${t('gamification.level')} ${level}`,
+      color: Colors.dark.warning,
+    },
     {
       icon: Flame,
       title: t('stats.currentStreak'),
       value: `${currentStreak} ${t('dashboard.days')}`,
-      subtitle: 'Keep going!',
+      subtitle: t('stats.keepGoing'),
+      color: Colors.dark.warning,
+    },
+    {
+      icon: Trophy,
+      title: t('gamification.longestStreak'),
+      value: `${longestStreak} ${t('dashboard.days')}`,
+      subtitle: t('stats.keepGoing'),
+      color: Colors.dark.primary,
+    },
+    {
+      icon: Video,
+      title: t('stats.videosWatched'),
+      value: totalVideosWatched.toString(),
+      subtitle: `${videoStreak} ${t('stats.videoStreak')}!`,
       color: Colors.dark.warning,
     },
     {
       icon: TrendingUp,
-      title: 'Completion Rate',
+      title: t('stats.completionRate'),
       value: `${completionRate}%`,
-      subtitle: `${completedHabits}/${totalHabits} habits today`,
+      subtitle: t('stats.habitsToday')
+        .replace('{completed}', completedHabits.toString())
+        .replace('{total}', totalHabits.toString()),
       color: Colors.dark.success,
     },
     {
       icon: Clock,
       title: t('stats.totalFocusTime'),
       value: `${focusHours}h ${focusMinutes}m`,
-      subtitle: `${completedSessions} sessions completed`,
+      subtitle: t('stats.sessionsCompleted').replace('{count}', completedSessions.toString()),
       color: Colors.dark.primary,
     },
     {
       icon: CheckCircle,
-      title: 'Focus Sessions',
+      title: t('stats.focusSessions'),
       value: totalSessions.toString(),
-      subtitle: `${totalDistractions} distractions logged`,
+      subtitle: t('stats.distractionsLogged').replace('{count}', totalDistractions.toString()),
       color: Colors.dark.primary,
     },
   ];
@@ -60,10 +137,24 @@ export default function StatsScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.title}>{t('stats.title')}</Text>
-        <Text style={styles.subtitle}>Track your transformation journey</Text>
+        <Text style={styles.subtitle}>{t('stats.subtitle')}</Text>
       </View>
 
       <LanguageSelector />
+      <RoutineReminderSettings />
+
+      {/* Botón de prueba - TEMPORAL para testing */}
+      {__DEV__ && (
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={testNotification}
+        >
+          <Bell size={20} color={Colors.dark.background} strokeWidth={2} />
+          <Text style={styles.testButtonText}>
+            {t('stats.testNotification')}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.grid}>
         {stats.map((stat, index) => {
@@ -88,7 +179,9 @@ export default function StatsScreen() {
         {habits.map(habit => (
           <View key={habit.id} style={styles.habitRow}>
             <View style={styles.habitInfo}>
-              <Text style={styles.habitName}>{habit.title}</Text>
+              <Text style={styles.habitName}>
+                {getHabitTitle(habit)}
+              </Text>
               <Text style={styles.habitType}>
                 {habit.type === 'good' ? t('habits.good') : t('habits.bad')}
               </Text>
@@ -218,5 +311,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.success + '20',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.dark.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 24,
+    gap: 8,
+  },
+  testButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: Colors.dark.background,
   },
 });

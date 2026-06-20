@@ -13,6 +13,7 @@ export default function IndexScreen() {
   useEffect(() => {
     if (!isLoading) {
       if (identity.setupComplete) {
+        // El modal de video se maneja ahora en el tabs/_layout.tsx
         router.replace('/(tabs)/dashboard');
       } else {
         router.replace('/onboarding');

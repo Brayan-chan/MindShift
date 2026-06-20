@@ -8,9 +8,9 @@ import { Check } from 'lucide-react-native';
 export default function LanguageSelector() {
   const { language, setLanguage, t } = useLanguage();
 
-  const languages: { code: Language; name: string; nativeName: string }[] = [
-    { code: 'es', name: 'Spanish', nativeName: 'Español' },
-    { code: 'en', name: 'English', nativeName: 'English' },
+  const languages: { code: Language; nameKey: string; nativeName: string }[] = [
+    { code: 'es', nameKey: 'settings.spanish', nativeName: 'Español' },
+    { code: 'en', nameKey: 'settings.english', nativeName: 'English' },
   ];
 
   return (
@@ -30,7 +30,7 @@ export default function LanguageSelector() {
             <View style={styles.optionContent}>
               <View>
                 <Text style={styles.languageName}>{lang.nativeName}</Text>
-                <Text style={styles.languageSubtext}>{lang.name}</Text>
+                <Text style={styles.languageSubtext}>{t(lang.nameKey)}</Text>
               </View>
               {language === lang.code && (
                 <Check size={24} color={Colors.dark.primary} strokeWidth={3} />

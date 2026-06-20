@@ -1,12 +1,37 @@
+import { useState, useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { LayoutDashboard, ListChecks, Target, BarChart3 } from 'lucide-react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useApp } from '@/contexts/AppContext';
 import Colors from '@/constants/colors';
+import DailyVideoModal from '@/components/DailyVideoModal';
 
 export default function TabLayout() {
   const { t } = useLanguage();
+  const { shouldShowVideo, getTodayVideo, markVideoAsWatched, skipVideo, videoStreak } = useApp();
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const todayVideo = getTodayVideo();
+
+  // Escuchar cambios en shouldShowVideo (cuando se toca la notificación)
+  useEffect(() => {
+    if (shouldShowVideo && todayVideo && !todayVideo.watched) {
+      console.log('shouldShowVideo changed to true - showing modal');
+      setShowVideoModal(true);
+    }
+  }, [shouldShowVideo, todayVideo]);
+
+  const handleVideoComplete = (videoId: string) => {
+    markVideoAsWatched(videoId);
+    setShowVideoModal(false);
+  };
+
+  const handleVideoSkip = () => {
+    skipVideo();
+    setShowVideoModal(false);
+  };
   
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -52,5 +77,16 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    {todayVideo && (
+      <DailyVideoModal
+        visible={showVideoModal}
+        videoUrl={todayVideo.videoUrl}
+        videoId={todayVideo.id}
+        onComplete={handleVideoComplete}
+        onSkip={handleVideoSkip}
+        videoStreak={videoStreak}
+      />
+    )}
+  </>
   );
 }

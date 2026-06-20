@@ -36,6 +36,7 @@ export default function OnboardingScreen() {
       targetIdentity,
       whyTransform,
       setupComplete: true,
+      coreValues: [],
     });
     router.replace('/(tabs)/dashboard');
   };

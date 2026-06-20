@@ -1,41 +1,56 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Play, Pause, X, AlertCircle } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
 
-const FOCUS_DURATION = 25 * 60 * 1000;
+const FOCUS_OPTIONS = [10, 25, 50] as const;
+const DEFAULT_FOCUS_MINUTES = 25;
 
 export default function FocusScreen() {
   const { startFocusSession, endFocusSession, addDistraction } = useApp();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  const [focusMinutes, setFocusMinutes] = useState(DEFAULT_FOCUS_MINUTES);
   const [isActive, setIsActive] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(FOCUS_DURATION);
+  const [timeRemaining, setTimeRemaining] = useState(DEFAULT_FOCUS_MINUTES * 60 * 1000);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const targetEndTimeRef = useRef<number | null>(null);
+  const completionTriggeredRef = useRef(false);
+  const focusDuration = focusMinutes * 60 * 1000;
 
   const handleComplete = useCallback(async () => {
     setIsActive(false);
     if (sessionId) {
-      await endFocusSession(sessionId, true);
+      await endFocusSession(sessionId, true, focusDuration);
     }
-    setTimeRemaining(FOCUS_DURATION);
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(
+      t('focus.focusComplete'),
+      t('focus.rewardMessage').replace('{xp}', '25')
+    );
+    setTimeRemaining(focusDuration);
     setSessionId(null);
-  }, [sessionId, endFocusSession]);
+    targetEndTimeRef.current = null;
+  }, [endFocusSession, focusDuration, sessionId, t]);
 
   useEffect(() => {
     if (isActive) {
       intervalRef.current = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev <= 1000) {
-            handleComplete();
-            return 0;
-          }
-          return prev - 1000;
-        });
+        const remaining = Math.max(
+          (targetEndTimeRef.current ?? Date.now()) - Date.now(),
+          0
+        );
+        setTimeRemaining(remaining);
+
+        if (remaining === 0 && !completionTriggeredRef.current) {
+          completionTriggeredRef.current = true;
+          handleComplete();
+        }
       }, 1000);
     } else {
       if (intervalRef.current) {
@@ -54,21 +69,34 @@ export default function FocusScreen() {
     const id = await startFocusSession();
     if (id) {
       setSessionId(id);
+      targetEndTimeRef.current = Date.now() + timeRemaining;
+      completionTriggeredRef.current = false;
       setIsActive(true);
     }
   };
 
+  const handleResume = () => {
+    targetEndTimeRef.current = Date.now() + timeRemaining;
+    completionTriggeredRef.current = false;
+    setIsActive(true);
+  };
+
   const handlePause = () => {
+    if (targetEndTimeRef.current) {
+      setTimeRemaining(Math.max(targetEndTimeRef.current - Date.now(), 0));
+    }
+    targetEndTimeRef.current = null;
     setIsActive(false);
   };
 
   const handleCancel = async () => {
     setIsActive(false);
     if (sessionId) {
-      await endFocusSession(sessionId, false);
+      await endFocusSession(sessionId, false, focusDuration - timeRemaining);
     }
-    setTimeRemaining(FOCUS_DURATION);
+    setTimeRemaining(focusDuration);
     setSessionId(null);
+    targetEndTimeRef.current = null;
   };
 
   const handleDistraction = async () => {
@@ -79,15 +107,43 @@ export default function FocusScreen() {
 
   const minutes = Math.floor(timeRemaining / 60000);
   const seconds = Math.floor((timeRemaining % 60000) / 1000);
-  const progress = 1 - (timeRemaining / FOCUS_DURATION);
+  const progress = 1 - (timeRemaining / focusDuration);
 
   return (
     <View style={styles.container}>
       <View style={[styles.content, { paddingTop: insets.top }]}>
-        <Text style={styles.title}>Deep Work</Text>
+        <Text style={styles.title}>{t('focus.title')}</Text>
         <Text style={styles.subtitle}>
-          {isActive ? 'Stay focused. Eliminate distractions.' : 'Ready to focus?'}
+          {isActive ? t('focus.stayFocused') : t('focus.ready')}
         </Text>
+
+        <View style={styles.durationSelector}>
+          {FOCUS_OPTIONS.map(option => (
+            <TouchableOpacity
+              key={option}
+              style={[
+                styles.durationOption,
+                focusMinutes === option && styles.durationOptionSelected,
+              ]}
+              onPress={() => {
+                if (!sessionId) {
+                  setFocusMinutes(option);
+                  setTimeRemaining(option * 60 * 1000);
+                }
+              }}
+              disabled={Boolean(sessionId)}
+            >
+              <Text
+                style={[
+                  styles.durationText,
+                  focusMinutes === option && styles.durationTextSelected,
+                ]}
+              >
+                {option} {t('dashboard.minutes')}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <View style={styles.timerContainer}>
           <View style={styles.progressRing}>
@@ -97,15 +153,15 @@ export default function FocusScreen() {
             <Text style={styles.timer}>
               {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
             </Text>
-            <Text style={styles.timerLabel}>minutes remaining</Text>
+            <Text style={styles.timerLabel}>{t('focus.minutesRemaining')}</Text>
           </View>
         </View>
 
         <View style={styles.controls}>
-          {!isActive && timeRemaining === FOCUS_DURATION && (
+          {!isActive && timeRemaining === focusDuration && (
             <TouchableOpacity style={styles.buttonPrimary} onPress={handleStart}>
               <Play size={24} color={Colors.dark.text} fill={Colors.dark.text} strokeWidth={2} />
-              <Text style={styles.buttonPrimaryText}>Start Session</Text>
+              <Text style={styles.buttonPrimaryText}>{t('focus.startSession')}</Text>
             </TouchableOpacity>
           )}
 
@@ -113,30 +169,34 @@ export default function FocusScreen() {
             <>
               <TouchableOpacity style={styles.buttonSecondary} onPress={handlePause}>
                 <Pause size={20} color={Colors.dark.text} strokeWidth={2} />
-                <Text style={styles.buttonSecondaryText}>Pause</Text>
+                <Text style={styles.buttonSecondaryText}>{t('focus.pauseSession')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.buttonDanger} onPress={handleDistraction}>
                 <AlertCircle size={20} color={Colors.dark.danger} strokeWidth={2} />
-                <Text style={styles.buttonDangerText}>Log Distraction</Text>
+                <Text style={styles.buttonDangerText}>{t('focus.logDistraction')}</Text>
               </TouchableOpacity>
             </>
           )}
 
-          {!isActive && timeRemaining < FOCUS_DURATION && (
+          {!isActive && timeRemaining < focusDuration && (
             <>
-              <TouchableOpacity style={styles.buttonPrimary} onPress={() => setIsActive(true)}>
+              <TouchableOpacity style={styles.buttonPrimary} onPress={handleResume}>
                 <Play size={24} color={Colors.dark.text} fill={Colors.dark.text} strokeWidth={2} />
-                <Text style={styles.buttonPrimaryText}>Resume</Text>
+                <Text style={styles.buttonPrimaryText}>{t('focus.resumeSession')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.buttonSecondary} onPress={handleCancel}>
                 <X size={20} color={Colors.dark.text} strokeWidth={2} />
-                <Text style={styles.buttonSecondaryText}>Cancel</Text>
+                <Text style={styles.buttonSecondaryText}>{t('focus.cancelSession')}</Text>
               </TouchableOpacity>
             </>
           )}
         </View>
+
+        <Text style={styles.rewardText}>
+          {t('focus.rewardMessage').replace('{xp}', '25')}
+        </Text>
       </View>
     </View>
   );
@@ -162,7 +222,34 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: Colors.dark.textSecondary,
-    marginBottom: 48,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  durationSelector: {
+    width: '100%',
+    flexDirection: 'row',
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 28,
+  },
+  durationOption: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  durationOptionSelected: {
+    backgroundColor: Colors.dark.primary,
+  },
+  durationText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.dark.textSecondary,
+  },
+  durationTextSelected: {
+    color: Colors.dark.background,
   },
   timerContainer: {
     width: 280,
@@ -203,6 +290,13 @@ const styles = StyleSheet.create({
   controls: {
     width: '100%',
     gap: 12,
+  },
+  rewardText: {
+    marginTop: 14,
+    fontSize: 13,
+    color: Colors.dark.warning,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   buttonPrimary: {
     flexDirection: 'row',

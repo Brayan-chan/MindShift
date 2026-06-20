@@ -1,14 +1,27 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Flame, TrendingUp, Brain, Clock } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Flame, TrendingUp, Brain, Clock, Zap, Trophy } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
 
 export default function DashboardScreen() {
-  const { identity, habits, currentStreak, totalFocusTime, todaysSessions } = useApp();
-  const { t } = useLanguage();
+  const {
+    identity,
+    habits,
+    currentStreak,
+    totalFocusTime,
+    todaysSessions,
+    todayXp,
+    totalXp,
+    dailyXpGoal,
+    level,
+    weeklyActivity,
+  } = useApp();
+  const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const goodHabitsCompleted = habits.filter(
     h => h.type === 'good' && h.completedToday
@@ -22,6 +35,7 @@ export default function DashboardScreen() {
   const todayFocusMinutes = Math.floor(
     todaysSessions.reduce((acc, s) => acc + s.duration, 0) / (1000 * 60)
   );
+  const xpProgress = Math.min(todayXp / dailyXpGoal, 1);
 
   const stats = [
     {
@@ -62,6 +76,76 @@ export default function DashboardScreen() {
         </Text>
       </View>
 
+      <View style={styles.progressPanel}>
+        <View style={styles.progressHeader}>
+          <View>
+            <Text style={styles.progressEyebrow}>{t('dashboard.dailyGoal')}</Text>
+            <Text style={styles.progressValue}>
+              {t('dashboard.xpToday')
+                .replace('{current}', todayXp.toString())
+                .replace('{goal}', dailyXpGoal.toString())}
+            </Text>
+          </View>
+          <View style={styles.levelBadge}>
+            <Zap size={18} color={Colors.dark.warning} fill={Colors.dark.warning} />
+            <Text style={styles.levelText}>
+              {t('dashboard.level').replace('{level}', level.toString())}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressBar, { width: `${xpProgress * 100}%` }]} />
+        </View>
+
+        <View style={styles.streakRow}>
+          <View style={styles.streakCopy}>
+            <Flame size={23} color={Colors.dark.warning} fill={Colors.dark.warning} />
+            <View>
+              <Text style={styles.streakValue}>{currentStreak}</Text>
+              <Text style={styles.streakLabel}>
+                {todayXp >= dailyXpGoal
+                  ? t('dashboard.streakActive')
+                  : t('dashboard.streakPending')}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.totalXp}>
+            <Trophy size={18} color={Colors.dark.primary} />
+            <Text style={styles.totalXpText}>{totalXp} XP</Text>
+          </View>
+        </View>
+
+        <Text style={styles.weekTitle}>{t('dashboard.weeklyConsistency')}</Text>
+        <View style={styles.weekRow}>
+          {weeklyActivity.map(day => {
+            const [year, month, date] = day.date.split('-').map(Number);
+            const dayLabel = new Intl.DateTimeFormat(
+              language === 'es' ? 'es-MX' : 'en-US',
+              { weekday: 'narrow' }
+            ).format(new Date(year, month - 1, date));
+            const intensity = Math.min(day.xp / dailyXpGoal, 1);
+
+            return (
+              <View key={day.date} style={styles.weekDay}>
+                <Text style={styles.weekDayLabel}>{dayLabel}</Text>
+                <View
+                  style={[
+                    styles.weekCell,
+                    day.xp > 0 && {
+                      backgroundColor: day.goalReached
+                        ? Colors.dark.success
+                        : Colors.dark.primary,
+                      opacity: 0.35 + intensity * 0.65,
+                    },
+                  ]}
+                />
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
       <View style={styles.identityCard}>
         <View style={styles.identitySection}>
           <Text style={styles.identityLabel}>{t('dashboard.from')}</Text>
@@ -96,15 +180,18 @@ export default function DashboardScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <TouchableOpacity style={styles.actionCard}>
+        <Text style={styles.sectionTitle}>{t('dashboard.quickActions')}</Text>
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => router.push('/(tabs)/focus')}
+        >
           <View style={styles.actionContent}>
             <View style={styles.actionIcon}>
               <Clock size={20} color={Colors.dark.primary} strokeWidth={2} />
             </View>
             <View style={styles.actionText}>
-              <Text style={styles.actionTitle}>Start Focus Session</Text>
-              <Text style={styles.actionSubtitle}>Enter deep work mode</Text>
+              <Text style={styles.actionTitle}>{t('dashboard.startFocus')}</Text>
+              <Text style={styles.actionSubtitle}>{t('dashboard.startFocusSubtitle')}</Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -115,8 +202,8 @@ export default function DashboardScreen() {
               <Brain size={20} color={Colors.dark.success} strokeWidth={2} />
             </View>
             <View style={styles.actionText}>
-              <Text style={styles.actionTitle}>Daily Reflection</Text>
-              <Text style={styles.actionSubtitle}>Review your day</Text>
+              <Text style={styles.actionTitle}>{t('dashboard.dailyReflection')}</Text>
+              <Text style={styles.actionSubtitle}>{t('dashboard.dailyReflectionSubtitle')}</Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -146,6 +233,113 @@ const styles = StyleSheet.create({
   subGreeting: {
     fontSize: 15,
     color: Colors.dark.textSecondary,
+  },
+  progressPanel: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: 18,
+    marginBottom: 24,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  progressEyebrow: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.dark.textSecondary,
+    marginBottom: 3,
+  },
+  progressValue: {
+    fontSize: 21,
+    fontWeight: '700',
+    color: Colors.dark.text,
+  },
+  levelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  levelText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.dark.warning,
+  },
+  progressTrack: {
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.dark.background,
+    overflow: 'hidden',
+    marginTop: 16,
+    marginBottom: 18,
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 6,
+    backgroundColor: Colors.dark.warning,
+  },
+  streakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  streakCopy: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  streakValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: Colors.dark.text,
+  },
+  streakLabel: {
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+    maxWidth: 190,
+  },
+  totalXp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  totalXpText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.dark.primary,
+  },
+  weekTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.dark.textSecondary,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  weekRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  weekDay: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  weekDayLabel: {
+    fontSize: 11,
+    color: Colors.dark.textTertiary,
+  },
+  weekCell: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    backgroundColor: Colors.dark.background,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
   identityCard: {
     backgroundColor: Colors.dark.surface,

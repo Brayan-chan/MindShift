@@ -2,18 +2,19 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Link } from 'expo-router';
 import { AlertCircle } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function NotFoundScreen() {
+  const { t } = useLanguage();
+
   return (
     <View style={styles.container}>
       <AlertCircle size={64} color={Colors.dark.danger} strokeWidth={2} />
-      <Text style={styles.title}>Page Not Found</Text>
-      <Text style={styles.subtitle}>
-        The page you&apos;re looking for doesn&apos;t exist.
-      </Text>
+      <Text style={styles.title}>{t('notFound.title')}</Text>
+      <Text style={styles.subtitle}>{t('notFound.description')}</Text>
       <Link href="/(tabs)/dashboard" asChild>
         <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Go to Dashboard</Text>
+          <Text style={styles.buttonText}>{t('notFound.action')}</Text>
         </TouchableOpacity>
       </Link>
     </View>

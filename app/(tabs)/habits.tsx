@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CheckCircle2, Circle, XCircle } from 'lucide-react-native';
-import { useApp } from '@/contexts/AppContext';
+import { DEFAULT_HABIT_TRANSLATION_KEYS, useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
 
@@ -12,6 +12,11 @@ export default function HabitsScreen() {
 
   const goodHabits = habits.filter(h => h.type === 'good');
   const badHabits = habits.filter(h => h.type === 'bad');
+
+  const getHabitTitle = (habit: typeof habits[0]) => {
+    const translationKey = DEFAULT_HABIT_TRANSLATION_KEYS[habit.id];
+    return translationKey ? t(translationKey) : habit.title;
+  };
 
   const renderHabit = (habit: typeof habits[0]) => {
     const isGood = habit.type === 'good';
@@ -36,13 +41,15 @@ export default function HabitsScreen() {
           <Icon size={28} color={iconColor} strokeWidth={2} />
         </View>
         <View style={styles.habitContent}>
-          <Text style={styles.habitTitle}>{habit.title}</Text>
+          <Text style={styles.habitTitle}>{getHabitTitle(habit)}</Text>
           <View style={styles.habitMeta}>
-            <Text style={styles.habitCategory}>{habit.category}</Text>
+            <Text style={styles.habitCategory}>{t(`habits.${habit.category}`)}</Text>
             {isGood && (
               <>
                 <View style={styles.dot} />
-                <Text style={styles.habitStreak}>{habit.streak} day streak</Text>
+                <Text style={styles.habitStreak}>
+                  {t('habits.dayStreak').replace('{count}', habit.streak.toString())}
+                </Text>
               </>
             )}
           </View>
@@ -58,16 +65,16 @@ export default function HabitsScreen() {
     >
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Build These</Text>
-          <Text style={styles.sectionSubtitle}>Good habits to develop</Text>
+          <Text style={styles.sectionTitle}>{t('habits.buildThese')}</Text>
+          <Text style={styles.sectionSubtitle}>{t('habits.buildTheseSubtitle')}</Text>
         </View>
         {goodHabits.map(renderHabit)}
       </View>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, styles.sectionTitleDanger]}>Break These</Text>
-          <Text style={styles.sectionSubtitle}>Bad habits to eliminate</Text>
+          <Text style={[styles.sectionTitle, styles.sectionTitleDanger]}>{t('habits.breakThese')}</Text>
+          <Text style={styles.sectionSubtitle}>{t('habits.breakTheseSubtitle')}</Text>
         </View>
         {badHabits.map(renderHabit)}
       </View>
