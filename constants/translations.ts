@@ -24,6 +24,7 @@ export const translations = {
       habits: 'Hábitos',
       focus: 'Enfoque',
       stats: 'Estadísticas',
+      settings: 'Ajustes',
     },
     
     onboarding: {
@@ -75,6 +76,8 @@ export const translations = {
       level: 'Nivel',
       longestStreak: 'Mejor racha',
       goalReached: 'Meta completada',
+      penalties: 'Sanciones',
+      penaltiesSubtitle: 'XP descontado por reglas activas',
     },
     
     habits: {
@@ -201,6 +204,10 @@ export const translations = {
       title: 'Recordatorios de rutina',
       subtitle: 'Elige cuándo quieres recibir impulsos para tu mañana, tarde, noche y racha.',
       timeLabel: 'Hora del recordatorio',
+      selectTime: 'Elegir hora',
+      hour: 'Hora',
+      minute: 'Minuto',
+      confirmTime: 'Usar esta hora',
       morningLabel: 'Rutina de mañana',
       morningDescription: 'Despertar, meditar, dientes y agua.',
       afternoonLabel: 'Impulso de la tarde',
@@ -219,6 +226,7 @@ export const translations = {
     
     reflection: {
       title: 'Reflexión Diaria',
+      subtitle: 'Cierra el día con claridad y prepara el siguiente paso.',
       todaysWins: 'Victorias de hoy',
       winsPlaceholder: '¿Qué lograste hoy?',
       improvements: 'Áreas de mejora',
@@ -232,6 +240,8 @@ export const translations = {
       energy: 'Nivel de Energía',
       mood: 'Estado de Ánimo',
       saveReflection: 'Guardar Reflexión',
+      savedTitle: 'Reflexión guardada',
+      savedBody: 'Tu cierre del día quedó registrado.',
     },
     
     warMode: {
@@ -247,6 +257,7 @@ export const translations = {
     
     settings: {
       title: 'Configuración',
+      subtitle: 'Ajusta la dificultad, las sanciones, el idioma y tus recordatorios.',
       language: 'Idioma',
       spanish: 'Español',
       english: 'Inglés',
@@ -260,6 +271,20 @@ export const translations = {
       defaultDuration: 'Duración Predeterminada',
       breakDuration: 'Duración de Descanso',
       longBreakAfter: 'Descanso Largo Después de',
+      dailyGoalTitle: 'Meta diaria de XP',
+      dailyGoalDescription: 'Elige si MindShift sube la dificultad automáticamente o si prefieres fijar tu propia meta.',
+      currentGoal: 'Meta actual',
+      auto: 'Automática',
+      manual: 'Manual',
+      autoGoal: 'Dificultad automática',
+      autoGoalBody: 'Tu meta automática actual es {goal} XP. Si completas una semana entera, sube 10 XP hasta un máximo de {max} XP.',
+      manualGoal: 'Meta manual',
+      sanctionsTitle: 'Sanciones',
+      sanctionsDescription: 'Activa consecuencias ligeras para mantener responsabilidad sin bloquear tu progreso.',
+      badHabitPenalty: 'Penalización por mal hábito',
+      missedGoalPenalty: 'Penalización por día activo incompleto',
+      penaltiesApplied: 'Sanciones acumuladas',
+      penaltiesAppliedBody: 'Hasta ahora se han descontado {penalty} XP por las reglas activas.',
     },
   },
   
@@ -286,6 +311,7 @@ export const translations = {
       habits: 'Habits',
       focus: 'Focus',
       stats: 'Statistics',
+      settings: 'Settings',
     },
     
     onboarding: {
@@ -337,6 +363,8 @@ export const translations = {
       level: 'Level',
       longestStreak: 'Best streak',
       goalReached: 'Goal reached',
+      penalties: 'Penalties',
+      penaltiesSubtitle: 'XP removed by active rules',
     },
     
     habits: {
@@ -463,6 +491,10 @@ export const translations = {
       title: 'Routine reminders',
       subtitle: 'Choose when to receive prompts for your morning, afternoon, evening, and streak.',
       timeLabel: 'Reminder time',
+      selectTime: 'Choose time',
+      hour: 'Hour',
+      minute: 'Minute',
+      confirmTime: 'Use this time',
       morningLabel: 'Morning routine',
       morningDescription: 'Wake up, meditate, brush, and drink water.',
       afternoonLabel: 'Afternoon boost',
@@ -481,6 +513,7 @@ export const translations = {
     
     reflection: {
       title: 'Daily Reflection',
+      subtitle: 'Close the day with clarity and prepare your next step.',
       todaysWins: 'Today\'s wins',
       winsPlaceholder: 'What did you accomplish today?',
       improvements: 'Areas for improvement',
@@ -494,6 +527,8 @@ export const translations = {
       energy: 'Energy Level',
       mood: 'Mood',
       saveReflection: 'Save Reflection',
+      savedTitle: 'Reflection saved',
+      savedBody: 'Your day review has been recorded.',
     },
     
     warMode: {
@@ -509,6 +544,7 @@ export const translations = {
     
     settings: {
       title: 'Settings',
+      subtitle: 'Adjust difficulty, penalties, language, and reminders.',
       language: 'Language',
       spanish: 'Spanish',
       english: 'English',
@@ -522,6 +558,20 @@ export const translations = {
       defaultDuration: 'Default Duration',
       breakDuration: 'Break Duration',
       longBreakAfter: 'Long Break After',
+      dailyGoalTitle: 'Daily XP goal',
+      dailyGoalDescription: 'Choose whether MindShift raises difficulty automatically or you prefer to set your own goal.',
+      currentGoal: 'Current goal',
+      auto: 'Automatic',
+      manual: 'Manual',
+      autoGoal: 'Automatic difficulty',
+      autoGoalBody: 'Your current automatic goal is {goal} XP. If you complete a full week, it increases by 10 XP up to {max} XP.',
+      manualGoal: 'Manual goal',
+      sanctionsTitle: 'Penalties',
+      sanctionsDescription: 'Enable light consequences to stay accountable without blocking your progress.',
+      badHabitPenalty: 'Bad habit penalty',
+      missedGoalPenalty: 'Incomplete active day penalty',
+      penaltiesApplied: 'Applied penalties',
+      penaltiesAppliedBody: '{penalty} XP has been removed so far by active rules.',
     },
   },
 } as const;

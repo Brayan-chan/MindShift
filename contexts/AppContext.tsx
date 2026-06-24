@@ -1,5 +1,6 @@
 import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fulltoast } from 'fulltoast';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import { Platform, AppState } from 'react-native';
@@ -11,9 +12,12 @@ import type {
   DailyVideo,
   RoutineReminder,
   RoutineReminderId,
+  AppSettings,
 } from '@/types';
 import { MOTIVATIONAL_VIDEOS, getRandomVideo } from '@/constants/videos';
+import { getFocusXpForDuration } from '@/constants/focusRewards';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { apiRequest } from '@/lib/api';
 
 const STORAGE_KEYS = {
   HABITS: '@apex_habits',
@@ -23,12 +27,37 @@ const STORAGE_KEYS = {
   DAILY_VIDEOS: '@apex_daily_videos',
   LAST_VIDEO_CHECK: '@apex_last_video_check',
   ROUTINE_REMINDERS: '@apex_routine_reminders',
+  APP_SETTINGS: '@apex_app_settings',
 } as const;
 
 const DAILY_XP_GOAL = 50;
+const AUTO_DAILY_XP_GOAL_MAX = 120;
+const AUTO_DAILY_XP_GOAL_STEP = 10;
 const HABIT_XP = 10;
 const VIDEO_XP = 10;
-const FOCUS_XP = 25;
+
+const DEFAULT_APP_SETTINGS: AppSettings = {
+  language: 'es',
+  darkMode: true,
+  gamification: {
+    goalMode: 'auto',
+    manualDailyXpGoal: DAILY_XP_GOAL,
+    sanctionsEnabled: true,
+    badHabitPenalty: 10,
+    missedGoalPenalty: 10,
+  },
+  notifications: {
+    habits: true,
+    reflections: true,
+    focusSessions: true,
+    motivational: true,
+  },
+  focusMode: {
+    defaultDuration: 25,
+    breakDuration: 5,
+    longBreakAfter: 4,
+  },
+};
 
 const DEFAULT_ROUTINE_REMINDERS: RoutineReminder[] = [
   { id: 'morning', enabled: true, time: '07:00' },
@@ -53,6 +82,13 @@ const DEFAULT_IDENTITY: UserIdentity = {
   whyTransform: '',
   setupComplete: false,
   coreValues: [],
+};
+
+type PendingHabitSync = {
+  desiredCompleted: boolean;
+  version: number;
+  timer: ReturnType<typeof setTimeout> | null;
+  inFlight: boolean;
 };
 
 export const DEFAULT_HABIT_TRANSLATION_KEYS: Record<string, string> = {
@@ -203,6 +239,65 @@ const getDateKey = (date = new Date()) => {
 
 const getTodayKey = () => getDateKey();
 
+const parseDateKey = (dateKey: string) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const addDays = (date: Date, days: number) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
+const getDateRange = (startDateKey: string, length: number) => {
+  const startDate = parseDateKey(startDateKey);
+
+  return Array.from({ length }, (_, index) => getDateKey(addDays(startDate, index)));
+};
+
+const mergeAppSettings = (settings?: Partial<AppSettings>): AppSettings => ({
+  ...DEFAULT_APP_SETTINGS,
+  ...settings,
+  gamification: {
+    ...DEFAULT_APP_SETTINGS.gamification,
+    ...settings?.gamification,
+  },
+  notifications: {
+    ...DEFAULT_APP_SETTINGS.notifications,
+    ...settings?.notifications,
+  },
+  focusMode: {
+    ...DEFAULT_APP_SETTINGS.focusMode,
+    ...settings?.focusMode,
+  },
+});
+
+const calculateAutoDailyXpGoal = (dailyXpByDate: Record<string, number>) => {
+  const activityDates = Object.keys(dailyXpByDate)
+    .filter(date => dailyXpByDate[date] > 0)
+    .sort();
+
+  if (activityDates.length === 0) return DAILY_XP_GOAL;
+
+  let goal = DAILY_XP_GOAL;
+  let weekStart = activityDates[0];
+  const today = getTodayKey();
+
+  while (getDateKey(addDays(parseDateKey(weekStart), 6)) < today) {
+    const weekDates = getDateRange(weekStart, 7);
+    const weekCompleted = weekDates.every(date => (dailyXpByDate[date] || 0) >= goal);
+
+    if (weekCompleted) {
+      goal = Math.min(goal + AUTO_DAILY_XP_GOAL_STEP, AUTO_DAILY_XP_GOAL_MAX);
+    }
+
+    weekStart = getDateKey(addDays(parseDateKey(weekStart), 7));
+  }
+
+  return goal;
+};
+
 const calculateHabitStreak = (history: Record<string, boolean>) => {
   let streak = 0;
   const checkDate = new Date();
@@ -217,6 +312,42 @@ const calculateHabitStreak = (history: Record<string, boolean>) => {
   }
 
   return streak;
+};
+
+const applyHabitCompletedState = (
+  habits: Habit[],
+  habitId: string,
+  completed: boolean,
+  dateKey = getTodayKey()
+) => habits.map(habit => {
+  if (habit.id !== habitId) return habit;
+
+  const history = {
+    ...habit.history,
+    [dateKey]: completed,
+  };
+
+  return {
+    ...habit,
+    completedToday: completed,
+    history,
+    streak: habit.type === 'good' ? calculateHabitStreak(history) : habit.streak,
+  };
+});
+
+const normalizeHabitsForToday = (rawHabits: Habit[]) => {
+  const storedHabitIds = new Set(rawHabits.map(habit => habit.id));
+  const missingDefaultHabits = DEFAULT_HABITS.filter(
+    habit => !storedHabitIds.has(habit.id)
+  );
+
+  return [...rawHabits, ...missingDefaultHabits].map(habit => ({
+    ...habit,
+    completedToday: Boolean(habit.history[getTodayKey()]),
+    streak: habit.type === 'good'
+      ? calculateHabitStreak(habit.history)
+      : habit.streak,
+  }));
 };
 
 const getSourceVideoIdFromUrl = (videoUrl?: string) => {
@@ -252,6 +383,9 @@ const parseReminderTime = (time: string) => {
   return { hour, minute };
 };
 
+const HABIT_SYNC_TOAST_ID = 'habit-sync-status';
+const HABIT_SYNC_LOADING_DELAY = 900;
+
 export const [AppProvider, useApp] = createContextHook(() => {
   const { t, isLoading: isLanguageLoading } = useLanguage();
   const [identity, setIdentity] = useState<UserIdentity>(DEFAULT_IDENTITY);
@@ -262,9 +396,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [routineReminders, setRoutineReminders] = useState<RoutineReminder[]>(
     DEFAULT_ROUTINE_REMINDERS
   );
+  const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [shouldShowVideo, setShouldShowVideo] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const appState = useRef(AppState.currentState);
+  const habitSyncQueue = useRef<Record<string, PendingHabitSync>>({});
+  const habitSyncToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Verificar si hay video pendiente
   const checkPendingVideo = useCallback(async () => {
@@ -417,6 +554,15 @@ export const [AppProvider, useApp] = createContextHook(() => {
     }
   }, [isLanguageLoading, setupNotifications]);
 
+  useEffect(() => {
+    return () => {
+      Object.values(habitSyncQueue.current).forEach(sync => {
+        if (sync.timer) clearTimeout(sync.timer);
+      });
+      if (habitSyncToastTimer.current) clearTimeout(habitSyncToastTimer.current);
+    };
+  }, []);
+
   const loadData = async () => {
     try {
       const [
@@ -427,6 +573,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         videosData,
         lastCheckData,
         remindersData,
+        appSettingsData,
       ] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.IDENTITY),
         AsyncStorage.getItem(STORAGE_KEYS.HABITS),
@@ -435,28 +582,33 @@ export const [AppProvider, useApp] = createContextHook(() => {
         AsyncStorage.getItem(STORAGE_KEYS.DAILY_VIDEOS),
         AsyncStorage.getItem(STORAGE_KEYS.LAST_VIDEO_CHECK),
         AsyncStorage.getItem(STORAGE_KEYS.ROUTINE_REMINDERS),
+        AsyncStorage.getItem(STORAGE_KEYS.APP_SETTINGS),
       ]);
 
       if (identityData) setIdentity(JSON.parse(identityData));
-      if (habitsData) {
-        const storedHabits: Habit[] = JSON.parse(habitsData);
-        const storedHabitIds = new Set(storedHabits.map(habit => habit.id));
-        const missingDefaultHabits = DEFAULT_HABITS.filter(
-          habit => !storedHabitIds.has(habit.id)
-        );
-        const normalizedHabits = [...storedHabits, ...missingDefaultHabits].map(habit => ({
-          ...habit,
-          completedToday: Boolean(habit.history[getTodayKey()]),
-          streak: habit.type === 'good'
-            ? calculateHabitStreak(habit.history)
-            : habit.streak,
-        }));
-
-        setHabits(normalizedHabits);
-        await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(normalizedHabits));
+      if (appSettingsData) {
+        const mergedSettings = mergeAppSettings(JSON.parse(appSettingsData));
+        setAppSettings(mergedSettings);
+        await AsyncStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(mergedSettings));
       } else {
-        setHabits(DEFAULT_HABITS);
-        await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(DEFAULT_HABITS));
+        await AsyncStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(DEFAULT_APP_SETTINGS));
+      }
+      try {
+        const remoteHabits = await apiRequest<Habit[]>('/habits');
+        setHabits(remoteHabits);
+        await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(remoteHabits));
+      } catch (error) {
+        console.log('Using local habits because API is unavailable:', error);
+
+        if (habitsData) {
+          const normalizedHabits = normalizeHabitsForToday(JSON.parse(habitsData));
+
+          setHabits(normalizedHabits);
+          await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(normalizedHabits));
+        } else {
+          setHabits(DEFAULT_HABITS);
+          await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(DEFAULT_HABITS));
+        }
       }
       if (sessionsData) setSessions(JSON.parse(sessionsData));
       if (reflectionsData) setReflections(JSON.parse(reflectionsData));
@@ -509,39 +661,202 @@ export const [AppProvider, useApp] = createContextHook(() => {
     await AsyncStorage.setItem(STORAGE_KEYS.IDENTITY, JSON.stringify(newIdentity));
   }, []);
 
-  const toggleHabit = useCallback(async (habitId: string) => {
-    const today = getTodayKey();
-
-    setHabits(prev => {
-      const updated = prev.map(habit => {
-        if (habit.id === habitId) {
-          const newCompleted = !habit.completedToday;
-          const newHistory = { ...habit.history, [today]: newCompleted };
-
-          const newStreak = habit.type === 'good'
-            ? calculateHabitStreak(newHistory)
-            : habit.streak;
-
-          return {
-            ...habit,
-            completedToday: newCompleted,
-            history: newHistory,
-            streak: newStreak,
-          };
-        }
-        return habit;
+  const updateAppSettings = useCallback(async (updates: Partial<AppSettings>) => {
+    setAppSettings(prev => {
+      const next = mergeAppSettings({
+        ...prev,
+        ...updates,
+        gamification: {
+          ...prev.gamification,
+          ...updates.gamification,
+        },
+        notifications: {
+          ...prev.notifications,
+          ...updates.notifications,
+        },
+        focusMode: {
+          ...prev.focusMode,
+          ...updates.focusMode,
+        },
       });
 
-      AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated));
-      return updated;
+      AsyncStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(next));
+      return next;
     });
   }, []);
 
-  const addHabit = useCallback(async (habit: Omit<Habit, 'id'>) => {
-    const newHabit: Habit = {
-      ...habit,
-      id: Date.now().toString(),
+  const persistHabits = useCallback((nextHabits: Habit[]) => {
+    AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(nextHabits));
+  }, []);
+
+  const flushHabitSync = useCallback(async (habitId: string) => {
+    const sync = habitSyncQueue.current[habitId];
+    if (!sync || sync.inFlight) return;
+
+    sync.inFlight = true;
+    sync.timer = null;
+    const completedToPersist = sync.desiredCompleted;
+    const versionToPersist = sync.version;
+    const clientMutationId = `${habitId}:${versionToPersist}`;
+    if (habitSyncToastTimer.current) clearTimeout(habitSyncToastTimer.current);
+    let promiseToastStarted = false;
+    const requestPromise = apiRequest<
+      Pick<Habit, 'id' | 'completedToday' | 'history'> & { clientMutationId?: string }
+    >(`/habits/${habitId}/completion`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        completed: completedToPersist,
+        clientMutationId,
+      }),
+    });
+
+    habitSyncToastTimer.current = setTimeout(() => {
+      promiseToastStarted = true;
+      fulltoast.promise(requestPromise, {
+        loading: {
+          id: HABIT_SYNC_TOAST_ID,
+          title: 'Guardando cambios',
+          description: 'Sincronizando tus hábitos...',
+        },
+        success: {
+          id: HABIT_SYNC_TOAST_ID,
+          title: 'Cambios guardados',
+          description: '',
+          duration: 1200,
+        },
+        error: {
+          id: HABIT_SYNC_TOAST_ID,
+          title: 'No se pudo guardar',
+          description: 'Revisa tu conexión e intenta de nuevo.',
+          duration: 6000,
+          button: {
+            title: 'Reintentar',
+            onPress: () => {
+              fulltoast.dismiss(HABIT_SYNC_TOAST_ID);
+              flushHabitSync(habitId);
+            },
+          },
+        },
+      }).catch(() => undefined);
+    }, HABIT_SYNC_LOADING_DELAY);
+
+    try {
+      const remoteHabit = await requestPromise;
+
+      const latestSync = habitSyncQueue.current[habitId];
+      if (latestSync?.version === versionToPersist) {
+        const today = getTodayKey();
+
+        setHabits(prev => {
+          const updated = applyHabitCompletedState(
+            prev,
+            habitId,
+            remoteHabit.completedToday,
+            Object.keys(remoteHabit.history)[0] ?? today
+          );
+          persistHabits(updated);
+          return updated;
+        });
+        if (habitSyncToastTimer.current) {
+          clearTimeout(habitSyncToastTimer.current);
+          habitSyncToastTimer.current = null;
+        }
+      }
+    } catch (error) {
+      const latestSync = habitSyncQueue.current[habitId];
+
+      if (latestSync?.version === versionToPersist) {
+        console.log('Could not sync habit completion:', error);
+        if (habitSyncToastTimer.current) {
+          clearTimeout(habitSyncToastTimer.current);
+          habitSyncToastTimer.current = null;
+        }
+        if (!promiseToastStarted) {
+          fulltoast.error({
+            id: HABIT_SYNC_TOAST_ID,
+            title: 'No se pudo guardar',
+            description: 'Revisa tu conexión e intenta de nuevo.',
+            duration: 6000,
+            button: {
+              title: 'Reintentar',
+              onPress: () => {
+                fulltoast.dismiss(HABIT_SYNC_TOAST_ID);
+                flushHabitSync(habitId);
+              },
+            },
+          });
+        }
+      }
+    } finally {
+      const latestSync = habitSyncQueue.current[habitId];
+      if (!latestSync) return;
+
+      latestSync.inFlight = false;
+
+      if (
+        latestSync.version !== versionToPersist ||
+        latestSync.desiredCompleted !== completedToPersist
+      ) {
+        latestSync.timer = setTimeout(() => {
+          flushHabitSync(habitId);
+        }, 300);
+      }
+    }
+  }, [persistHabits]);
+
+  const queueHabitSync = useCallback((habitId: string, completed: boolean) => {
+    const existing = habitSyncQueue.current[habitId];
+    const nextVersion = (existing?.version ?? 0) + 1;
+
+    if (existing?.timer) {
+      clearTimeout(existing.timer);
+    }
+
+    habitSyncQueue.current[habitId] = {
+      desiredCompleted: completed,
+      version: nextVersion,
+      timer: setTimeout(() => {
+        flushHabitSync(habitId);
+      }, 300),
+      inFlight: existing?.inFlight ?? false,
     };
+
+  }, [flushHabitSync]);
+
+  const toggleHabit = useCallback(async (habitId: string) => {
+    let nextCompleted = false;
+
+    setHabits(prev => {
+      const habit = prev.find(item => item.id === habitId);
+      nextCompleted = !habit?.completedToday;
+      const updated = applyHabitCompletedState(prev, habitId, nextCompleted);
+      persistHabits(updated);
+      return updated;
+    });
+
+    queueHabitSync(habitId, nextCompleted);
+  }, [persistHabits, queueHabitSync]);
+
+  const addHabit = useCallback(async (habit: Omit<Habit, 'id'>) => {
+    let newHabit: Habit;
+
+    try {
+      newHabit = await apiRequest<Habit>('/habits', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: habit.title,
+          type: habit.type,
+          category: habit.category,
+          targetDays: habit.targetDays,
+        }),
+      });
+    } catch (error) {
+      console.log('Creating habit locally because API is unavailable:', error);
+      newHabit = {
+        ...habit,
+        id: Date.now().toString(),
+      };
+    }
 
     setHabits(prev => {
       const updated = [...prev, newHabit];
@@ -605,13 +920,16 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, []);
 
   const saveReflection = useCallback(async (reflection: Omit<Reflection, 'id'>) => {
-    const newReflection: Reflection = {
-      ...reflection,
-      id: Date.now().toString(),
-    };
-
     setReflections(prev => {
-      const updated = [...prev, newReflection];
+      const existingReflection = prev.find(item => item.date === reflection.date);
+      const nextReflection: Reflection = {
+        ...reflection,
+        id: existingReflection?.id ?? Date.now().toString(),
+      };
+      const updated = existingReflection
+        ? prev.map(item => item.date === reflection.date ? nextReflection : item)
+        : [...prev, nextReflection];
+
       AsyncStorage.setItem(STORAGE_KEYS.REFLECTIONS, JSON.stringify(updated));
       return updated;
     });
@@ -696,11 +1014,18 @@ export const [AppProvider, useApp] = createContextHook(() => {
     const xpByDate: Record<string, number> = {};
 
     habits
-      .filter(habit => habit.type === 'good')
       .forEach(habit => {
         Object.entries(habit.history).forEach(([date, completed]) => {
-          if (completed) {
+          if (completed && habit.type === 'good') {
             xpByDate[date] = (xpByDate[date] || 0) + HABIT_XP;
+          }
+
+          if (
+            completed &&
+            habit.type === 'bad' &&
+            appSettings.gamification.sanctionsEnabled
+          ) {
+            xpByDate[date] = (xpByDate[date] || 0) - appSettings.gamification.badHabitPenalty;
           }
         });
       });
@@ -709,7 +1034,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       .filter(session => session.completed)
       .forEach(session => {
         const date = getDateKey(new Date(session.startTime));
-        xpByDate[date] = (xpByDate[date] || 0) + FOCUS_XP;
+        xpByDate[date] = (xpByDate[date] || 0) + getFocusXpForDuration(session.duration);
       });
 
     dailyVideos
@@ -719,21 +1044,68 @@ export const [AppProvider, useApp] = createContextHook(() => {
       });
 
     return xpByDate;
-  }, [dailyVideos, habits, sessions]);
+  }, [
+    appSettings.gamification.badHabitPenalty,
+    appSettings.gamification.sanctionsEnabled,
+    dailyVideos,
+    habits,
+    sessions,
+  ]);
+
+  const autoDailyXpGoal = useMemo(
+    () => calculateAutoDailyXpGoal(dailyXpByDate),
+    [dailyXpByDate]
+  );
+
+  const dailyXpGoal = appSettings.gamification.goalMode === 'manual'
+    ? appSettings.gamification.manualDailyXpGoal
+    : autoDailyXpGoal;
+
+  const dailyPenaltyByDate = useMemo(() => {
+    if (!appSettings.gamification.sanctionsEnabled) return {};
+
+    const today = getTodayKey();
+    return Object.entries(dailyXpByDate).reduce<Record<string, number>>((acc, [date, xp]) => {
+      if (date < today && xp > 0 && xp < dailyXpGoal) {
+        acc[date] = appSettings.gamification.missedGoalPenalty;
+      }
+
+      return acc;
+    }, {});
+  }, [
+    appSettings.gamification.missedGoalPenalty,
+    appSettings.gamification.sanctionsEnabled,
+    dailyXpByDate,
+    dailyXpGoal,
+  ]);
+
+  const missedGoalPenaltyXp = Object.values(dailyPenaltyByDate).reduce((sum, xp) => sum + xp, 0);
+  const badHabitPenaltyXp = appSettings.gamification.sanctionsEnabled
+    ? habits
+      .filter(habit => habit.type === 'bad')
+      .reduce((sum, habit) => {
+        const completions = Object.values(habit.history).filter(Boolean).length;
+        return sum + completions * appSettings.gamification.badHabitPenalty;
+      }, 0)
+    : 0;
+  const totalPenaltyXp = missedGoalPenaltyXp + badHabitPenaltyXp;
 
   const todayXp = dailyXpByDate[getTodayKey()] || 0;
-  const totalXp = Object.values(dailyXpByDate).reduce((sum, xp) => sum + xp, 0);
+  const totalXp = Math.max(
+    0,
+    Object.values(dailyXpByDate).reduce((sum, xp) => sum + xp, 0) - missedGoalPenaltyXp
+  );
   const level = Math.floor(totalXp / 500) + 1;
 
   const currentStreak = (() => {
     let streak = 0;
     const checkDate = new Date();
 
-    if ((dailyXpByDate[getDateKey(checkDate)] || 0) < DAILY_XP_GOAL) {
+    if ((dailyXpByDate[getDateKey(checkDate)] || 0) < dailyXpGoal) {
       checkDate.setDate(checkDate.getDate() - 1);
     }
 
-    while ((dailyXpByDate[getDateKey(checkDate)] || 0) >= DAILY_XP_GOAL) {
+    while ((dailyXpByDate[getDateKey(checkDate)] || 0) >= dailyXpGoal) {
       streak += 1;
       checkDate.setDate(checkDate.getDate() - 1);
     }
@@ -743,7 +1115,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const longestStreak = (() => {
     const completedDates = Object.entries(dailyXpByDate)
-      .filter(([, xp]) => xp >= DAILY_XP_GOAL)
+      .filter(([, xp]) => xp >= dailyXpGoal)
       .map(([date]) => date)
       .sort();
     let longest = 0;
@@ -773,7 +1145,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     return {
       date: dateKey,
       xp: dailyXpByDate[dateKey] || 0,
-      goalReached: (dailyXpByDate[dateKey] || 0) >= DAILY_XP_GOAL,
+      goalReached: (dailyXpByDate[dateKey] || 0) >= dailyXpGoal,
+      penalty: dailyPenaltyByDate[dateKey] || 0,
     };
   });
 
@@ -821,9 +1194,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
     reflections,
     dailyVideos,
     routineReminders,
+    appSettings,
     isLoading,
     shouldShowVideo,
     saveIdentity,
+    updateAppSettings,
     toggleHabit,
     addHabit,
     startFocusSession,
@@ -842,7 +1217,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
     videoStreak,
     todayXp,
     totalXp,
-    dailyXpGoal: DAILY_XP_GOAL,
+    totalPenaltyXp,
+    dailyXpGoal,
+    autoDailyXpGoal,
     level,
     weeklyActivity,
   }), [
@@ -852,9 +1229,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
     reflections,
     dailyVideos,
     routineReminders,
+    appSettings,
     isLoading,
     shouldShowVideo,
     saveIdentity,
+    updateAppSettings,
     toggleHabit,
     addHabit,
     startFocusSession,
@@ -873,6 +1252,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
     videoStreak,
     todayXp,
     totalXp,
+    totalPenaltyXp,
+    dailyXpGoal,
+    autoDailyXpGoal,
     level,
     weeklyActivity,
   ]);

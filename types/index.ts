@@ -2,6 +2,7 @@ export type Language = 'es' | 'en';
 
 export type Habit = {
   id: string;
+  legacyId?: string;
   title: string;
   description?: string;
   type: 'good' | 'bad';
@@ -116,6 +117,16 @@ export type Stats = {
   videoStreak: number;
 };
 
+export type GoalMode = 'auto' | 'manual';
+
+export type GamificationSettings = {
+  goalMode: GoalMode;
+  manualDailyXpGoal: number;
+  sanctionsEnabled: boolean;
+  badHabitPenalty: number;
+  missedGoalPenalty: number;
+};
+
 export type UserIdentity = {
   currentIdentity: string;
   targetIdentity: string;
@@ -127,6 +138,7 @@ export type UserIdentity = {
 export type AppSettings = {
   language: Language;
   darkMode: boolean;
+  gamification: GamificationSettings;
   notifications: {
     habits: boolean;
     reflections: boolean;
