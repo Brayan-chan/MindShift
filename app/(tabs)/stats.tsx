@@ -1,12 +1,9 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TrendingUp, Flame, Clock, CheckCircle, Video, Bell, Zap, Trophy } from 'lucide-react-native';
-import * as Notifications from 'expo-notifications';
+import { TrendingUp, Flame, Clock, CheckCircle, Video, Zap, Trophy, ShieldAlert } from 'lucide-react-native';
 import { DEFAULT_HABIT_TRANSLATION_KEYS, useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
-import LanguageSelector from '@/components/LanguageSelector';
-import RoutineReminderSettings from '@/components/RoutineReminderSettings';
 
 export default function StatsScreen() {
   const {
@@ -18,46 +15,11 @@ export default function StatsScreen() {
     dailyVideos,
     videoStreak,
     totalXp,
+    totalPenaltyXp,
     level,
   } = useApp();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
-
-  const testNotification = async () => {
-    if (Platform.OS === 'web') {
-      Alert.alert(
-        t('stats.notificationUnsupportedTitle'),
-        t('stats.notificationUnsupportedBody')
-      );
-      return;
-    }
-
-    try {
-      // Programar notificación en 5 segundos
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: t('stats.testNotificationTitle'),
-          body: t('stats.testNotificationBody'),
-          data: { type: 'daily-video' },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: 5
-        },
-      });
-
-      Alert.alert(
-        t('stats.notificationScheduledTitle'),
-        t('stats.notificationScheduledBody'),
-        [{ text: t('common.ok') }]
-      );
-    } catch (error) {
-      Alert.alert(
-        t('common.error'),
-        t('stats.notificationError').replace('{error}', String(error))
-      );
-    }
-  };
 
   const completedHabits = habits.filter(h => h.type === 'good' && h.completedToday).length;
   const totalHabits = habits.filter(h => h.type === 'good').length;
@@ -72,7 +34,7 @@ export default function StatsScreen() {
 
   const totalVideosWatched = dailyVideos.filter(v => v.watched).length;
   const getHabitTitle = (habit: typeof habits[0]) => {
-    const translationKey = DEFAULT_HABIT_TRANSLATION_KEYS[habit.id];
+    const translationKey = DEFAULT_HABIT_TRANSLATION_KEYS[habit.legacyId ?? habit.id];
     return translationKey ? t(translationKey) : habit.title;
   };
 
@@ -83,6 +45,13 @@ export default function StatsScreen() {
       value: totalXp.toString(),
       subtitle: `${t('gamification.level')} ${level}`,
       color: Colors.dark.warning,
+    },
+    {
+      icon: ShieldAlert,
+      title: t('gamification.penalties'),
+      value: `-${totalPenaltyXp}`,
+      subtitle: t('gamification.penaltiesSubtitle'),
+      color: Colors.dark.danger,
     },
     {
       icon: Flame,
@@ -139,22 +108,6 @@ export default function StatsScreen() {
         <Text style={styles.title}>{t('stats.title')}</Text>
         <Text style={styles.subtitle}>{t('stats.subtitle')}</Text>
       </View>
-
-      <LanguageSelector />
-      <RoutineReminderSettings />
-
-      {/* Botón de prueba - TEMPORAL para testing */}
-      {__DEV__ && (
-        <TouchableOpacity
-          style={styles.testButton}
-          onPress={testNotification}
-        >
-          <Bell size={20} color={Colors.dark.background} strokeWidth={2} />
-          <Text style={styles.testButtonText}>
-            {t('stats.testNotification')}
-          </Text>
-        </TouchableOpacity>
-      )}
 
       <View style={styles.grid}>
         {stats.map((stat, index) => {
@@ -311,21 +264,5 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.success + '20',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  testButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.dark.primary,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginBottom: 24,
-    gap: 8,
-  },
-  testButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: Colors.dark.background,
   },
 });
