@@ -35,3 +35,10 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 .vercel
+
+# Fulltoast library
+README-Fulltoast.md
+example/
+
+# bun
+bun.lockb
