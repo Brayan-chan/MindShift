@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Tabs } from 'expo-router';
-import { LayoutDashboard, ListChecks, Target, BarChart3 } from 'lucide-react-native';
+import { LayoutDashboard, ListChecks, Target, BarChart3, Settings } from 'lucide-react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApp } from '@/contexts/AppContext';
 import Colors from '@/constants/colors';
@@ -74,6 +74,13 @@ export default function TabLayout() {
         options={{
           title: t('tabs.stats'),
           tabBarIcon: ({ color }) => <BarChart3 size={24} color={color} strokeWidth={2} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: t('tabs.settings'),
+          tabBarIcon: ({ color }) => <Settings size={24} color={color} strokeWidth={2} />,
         }}
       />
     </Tabs>
