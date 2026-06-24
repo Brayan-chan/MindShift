@@ -14,7 +14,7 @@ export default function HabitsScreen() {
   const badHabits = habits.filter(h => h.type === 'bad');
 
   const getHabitTitle = (habit: typeof habits[0]) => {
-    const translationKey = DEFAULT_HABIT_TRANSLATION_KEYS[habit.id];
+    const translationKey = DEFAULT_HABIT_TRANSLATION_KEYS[habit.legacyId ?? habit.id];
     return translationKey ? t(translationKey) : habit.title;
   };
 
