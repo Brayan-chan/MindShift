@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Flame, TrendingUp, Brain, Clock, Zap, Trophy } from 'lucide-react-native';
+import { Flame, TrendingUp, Brain, Clock, Zap, Trophy, CheckCircle2 } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
@@ -18,6 +18,7 @@ export default function DashboardScreen() {
     dailyXpGoal,
     level,
     weeklyActivity,
+    todayReflection,
   } = useApp();
   const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -35,7 +36,7 @@ export default function DashboardScreen() {
   const todayFocusMinutes = Math.floor(
     todaysSessions.reduce((acc, s) => acc + s.duration, 0) / (1000 * 60)
   );
-  const xpProgress = Math.min(todayXp / dailyXpGoal, 1);
+  const xpProgress = Math.min(Math.max(todayXp, 0) / dailyXpGoal, 1);
 
   const stats = [
     {
@@ -124,7 +125,7 @@ export default function DashboardScreen() {
               language === 'es' ? 'es-MX' : 'en-US',
               { weekday: 'narrow' }
             ).format(new Date(year, month - 1, date));
-            const intensity = Math.min(day.xp / dailyXpGoal, 1);
+            const intensity = Math.min(Math.max(day.xp, 0) / dailyXpGoal, 1);
 
             return (
               <View key={day.date} style={styles.weekDay}>
@@ -196,14 +197,25 @@ export default function DashboardScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionCard}>
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => router.push('/reflection')}
+        >
           <View style={styles.actionContent}>
             <View style={styles.actionIcon}>
-              <Brain size={20} color={Colors.dark.success} strokeWidth={2} />
+              {todayReflection ? (
+                <CheckCircle2 size={20} color={Colors.dark.success} strokeWidth={2} />
+              ) : (
+                <Brain size={20} color={Colors.dark.success} strokeWidth={2} />
+              )}
             </View>
             <View style={styles.actionText}>
               <Text style={styles.actionTitle}>{t('dashboard.dailyReflection')}</Text>
-              <Text style={styles.actionSubtitle}>{t('dashboard.dailyReflectionSubtitle')}</Text>
+              <Text style={styles.actionSubtitle}>
+                {todayReflection
+                  ? t('reflection.savedBody')
+                  : t('dashboard.dailyReflectionSubtitle')}
+              </Text>
             </View>
           </View>
         </TouchableOpacity>
