@@ -722,7 +722,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
           id: HABIT_SYNC_TOAST_ID,
           title: 'Cambios guardados',
           description: '',
-          duration: 1200,
+          duration: 1500,
         },
         error: {
           id: HABIT_SYNC_TOAST_ID,
