@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
+import { FOCUS_REWARD_BY_MINUTES, getFocusXpForMinutes } from '@/constants/focusRewards';
 
 const FOCUS_OPTIONS = [10, 25, 50] as const;
 const DEFAULT_FOCUS_MINUTES = 25;
@@ -22,6 +23,7 @@ export default function FocusScreen() {
   const targetEndTimeRef = useRef<number | null>(null);
   const completionTriggeredRef = useRef(false);
   const focusDuration = focusMinutes * 60 * 1000;
+  const focusRewardXp = getFocusXpForMinutes(focusMinutes);
 
   const handleComplete = useCallback(async () => {
     setIsActive(false);
@@ -31,12 +33,12 @@ export default function FocusScreen() {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert(
       t('focus.focusComplete'),
-      t('focus.rewardMessage').replace('{xp}', '25')
+      t('focus.rewardMessage').replace('{xp}', String(focusRewardXp))
     );
     setTimeRemaining(focusDuration);
     setSessionId(null);
     targetEndTimeRef.current = null;
-  }, [endFocusSession, focusDuration, sessionId, t]);
+  }, [endFocusSession, focusDuration, focusRewardXp, sessionId, t]);
 
   useEffect(() => {
     if (isActive) {
@@ -141,6 +143,14 @@ export default function FocusScreen() {
               >
                 {option} {t('dashboard.minutes')}
               </Text>
+              <Text
+                style={[
+                  styles.durationReward,
+                  focusMinutes === option && styles.durationRewardSelected,
+                ]}
+              >
+                +{FOCUS_REWARD_BY_MINUTES[option]} XP
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -195,7 +205,7 @@ export default function FocusScreen() {
         </View>
 
         <Text style={styles.rewardText}>
-          {t('focus.rewardMessage').replace('{xp}', '25')}
+          {t('focus.rewardMessage').replace('{xp}', String(focusRewardXp))}
         </Text>
       </View>
     </View>
@@ -235,7 +245,7 @@ const styles = StyleSheet.create({
   },
   durationOption: {
     flex: 1,
-    minHeight: 38,
+    minHeight: 48,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
@@ -249,6 +259,16 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
   },
   durationTextSelected: {
+    color: Colors.dark.background,
+  },
+  durationReward: {
+    marginTop: 2,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    color: Colors.dark.warning,
+  },
+  durationRewardSelected: {
     color: Colors.dark.background,
   },
   timerContainer: {
