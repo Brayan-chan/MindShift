@@ -1,17 +1,27 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useApp } from '@/contexts/AppContext';
 import type { Language } from '@/types';
 import Colors from '@/constants/colors';
 import { Check } from 'lucide-react-native';
 
 export default function LanguageSelector() {
   const { language, setLanguage, t } = useLanguage();
+  const { appSettings, updateAppSettings } = useApp();
 
   const languages: { code: Language; nameKey: string; nativeName: string }[] = [
     { code: 'es', nameKey: 'settings.spanish', nativeName: 'Español' },
     { code: 'en', nameKey: 'settings.english', nativeName: 'English' },
   ];
+
+  const handleSelectLanguage = (nextLanguage: Language) => {
+    setLanguage(nextLanguage);
+    updateAppSettings({
+      ...appSettings,
+      language: nextLanguage,
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -24,7 +34,7 @@ export default function LanguageSelector() {
               styles.option,
               language === lang.code && styles.optionSelected,
             ]}
-            onPress={() => setLanguage(lang.code)}
+            onPress={() => handleSelectLanguage(lang.code)}
             activeOpacity={0.7}
           >
             <View style={styles.optionContent}>
