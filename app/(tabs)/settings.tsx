@@ -1,7 +1,8 @@
 import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
-import { Bell, Minus, Plus, ShieldAlert, SlidersHorizontal, Target, Zap } from 'lucide-react-native';
+import { Bell, LogOut, Minus, Plus, ShieldAlert, SlidersHorizontal, Target, Zap } from 'lucide-react-native';
 import { fulltoast } from 'fulltoast';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -12,12 +13,14 @@ import RoutineReminderSettings from '@/components/RoutineReminderSettings';
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const {
     appSettings,
     updateAppSettings,
     dailyXpGoal,
     autoDailyXpGoal,
     totalPenaltyXp,
+    logoutSession,
   } = useApp();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -79,6 +82,11 @@ export default function SettingsScreen() {
     updateGamification({
       [key]: clamp(nextPenalty, 0, 50),
     });
+  };
+
+  const handleLogout = async () => {
+    await logoutSession();
+    router.replace('/auth');
   };
 
   return (
@@ -233,6 +241,14 @@ export default function SettingsScreen() {
           <Text style={styles.testButtonText}>{t('stats.testNotification')}</Text>
         </TouchableOpacity>
       )}
+
+      <TouchableOpacity activeOpacity={0.86} style={styles.logoutButton} onPress={handleLogout}>
+        <LogOut size={20} color={Colors.dark.danger} strokeWidth={2.2} />
+        <View style={styles.logoutCopy}>
+          <Text style={styles.logoutTitle}>{t('settings.logout')}</Text>
+          <Text style={styles.logoutSubtitle}>{t('settings.logoutSubtitle')}</Text>
+        </View>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -459,5 +475,30 @@ const styles = StyleSheet.create({
     color: Colors.dark.background,
     fontSize: 14,
     fontWeight: '800',
+  },
+  logoutButton: {
+    minHeight: 66,
+    borderRadius: 8,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.danger + '55',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+  },
+  logoutCopy: {
+    flex: 1,
+  },
+  logoutTitle: {
+    color: Colors.dark.danger,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  logoutSubtitle: {
+    color: Colors.dark.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
   },
 });
