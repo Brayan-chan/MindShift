@@ -41,6 +41,33 @@ export const translations = {
       continue: 'Continuar',
       identityStatement: 'Declaración de Identidad',
     },
+
+    auth: {
+      title: 'Entra a MindShift',
+      subtitle: 'Tu progreso ahora vive en tu cuenta. Regístrate o inicia sesión para continuar.',
+      login: 'Iniciar sesión',
+      register: 'Crear cuenta',
+      identifier: 'Correo o usuario',
+      email: 'Correo electrónico',
+      username: 'Nombre de usuario',
+      usernameHint: 'Usa 3-24 caracteres: letras, números, guion o guion bajo.',
+      displayName: 'Nombre visible',
+      password: 'Contraseña',
+      createAccount: 'Crear cuenta',
+      enter: 'Entrar',
+      errorTitle: 'No pudimos continuar',
+      errorBody: 'Revisa tus datos e inténtalo de nuevo.',
+    },
+
+    videoIntro: {
+      title: 'Videos diarios para mantenerte en movimiento',
+      subtitle: 'Cada día MindShift preparará un video motivacional corto para abrir la app con intención.',
+      dailyTitle: 'Un impulso diario',
+      dailyBody: 'Recibirás recordatorios para ver tu video y proteger tu constancia.',
+      firstTitle: 'Empieza ahora',
+      firstBody: 'Después de continuar verás tu primer video motivacional y entrarás al panel.',
+      continue: 'Continuar al primer video',
+    },
     
     dashboard: {
       transformation: 'Tu Transformación',
@@ -297,6 +324,8 @@ export const translations = {
       missedGoalPenalty: 'Penalización por día activo incompleto',
       penaltiesApplied: 'Sanciones acumuladas',
       penaltiesAppliedBody: 'Hasta ahora se han descontado {penalty} XP por las reglas activas.',
+      logout: 'Cerrar sesión',
+      logoutSubtitle: 'Sal de esta cuenta y vuelve al acceso inicial.',
     },
   },
   
@@ -339,6 +368,33 @@ export const translations = {
       begin: 'Begin Transformation',
       continue: 'Continue',
       identityStatement: 'Identity Statement',
+    },
+
+    auth: {
+      title: 'Enter MindShift',
+      subtitle: 'Your progress now lives in your account. Sign up or log in to continue.',
+      login: 'Log in',
+      register: 'Create account',
+      identifier: 'Email or username',
+      email: 'Email',
+      username: 'Username',
+      usernameHint: 'Use 3-24 characters: letters, numbers, hyphen, or underscore.',
+      displayName: 'Display name',
+      password: 'Password',
+      createAccount: 'Create account',
+      enter: 'Enter',
+      errorTitle: 'We could not continue',
+      errorBody: 'Check your details and try again.',
+    },
+
+    videoIntro: {
+      title: 'Daily videos to keep you moving',
+      subtitle: 'Every day MindShift will prepare a short motivational video so you open the app with intention.',
+      dailyTitle: 'A daily boost',
+      dailyBody: 'You will receive reminders to watch your video and protect your consistency.',
+      firstTitle: 'Start now',
+      firstBody: 'After continuing, you will see your first motivational video and enter the dashboard.',
+      continue: 'Continue to first video',
     },
     
     dashboard: {
@@ -596,6 +652,8 @@ export const translations = {
       missedGoalPenalty: 'Incomplete active day penalty',
       penaltiesApplied: 'Applied penalties',
       penaltiesAppliedBody: '{penalty} XP has been removed so far by active rules.',
+      logout: 'Log out',
+      logoutSubtitle: 'Leave this account and return to the initial access screen.',
     },
   },
 } as const;
