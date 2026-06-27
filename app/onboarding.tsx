@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   TextInput,
@@ -14,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowRight, Target, Zap, Globe2 } from 'lucide-react-native';
+import { fulltoast } from 'fulltoast';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
@@ -29,16 +31,30 @@ export default function OnboardingScreen() {
   const [currentIdentity, setCurrentIdentity] = useState('');
   const [targetIdentity, setTargetIdentity] = useState('');
   const [whyTransform, setWhyTransform] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleComplete = async () => {
-    await saveIdentity({
-      currentIdentity,
-      targetIdentity,
-      whyTransform,
-      setupComplete: true,
-      coreValues: [],
-    });
-    router.replace('/(tabs)/dashboard');
+    if (isSaving) return;
+
+    setIsSaving(true);
+    try {
+      await saveIdentity({
+        currentIdentity,
+        targetIdentity,
+        whyTransform,
+        setupComplete: true,
+        videoIntroComplete: false,
+        coreValues: [],
+      });
+      router.replace('/video-intro');
+    } catch (error) {
+      fulltoast.error({
+        title: t('auth.errorTitle'),
+        description: error instanceof Error ? error.message : t('auth.errorBody'),
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const steps = [
@@ -71,7 +87,7 @@ export default function OnboardingScreen() {
 
   const currentStep = steps[step];
   const Icon = currentStep.icon;
-  const canProceed = currentStep.value.trim().length > 10;
+  const canProceed = currentStep.value.trim().length > 10 && !isSaving;
 
   const handleNext = () => {
     if (step < steps.length - 1) {
@@ -160,7 +176,11 @@ export default function OnboardingScreen() {
             <Text style={styles.buttonText}>
               {step === steps.length - 1 ? t('onboarding.begin') : t('onboarding.continue')}
             </Text>
-            <ArrowRight size={20} color={Colors.dark.text} strokeWidth={2.5} />
+            {isSaving ? (
+              <ActivityIndicator color={Colors.dark.text} />
+            ) : (
+              <ArrowRight size={20} color={Colors.dark.text} strokeWidth={2.5} />
+            )}
           </TouchableOpacity>
         </View>
         </ScrollView>
