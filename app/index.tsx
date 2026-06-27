@@ -7,19 +7,22 @@ import Colors from '@/constants/colors';
 
 export default function IndexScreen() {
   const router = useRouter();
-  const { identity, isLoading } = useApp();
+  const { identity, isAuthenticated, isLoading } = useApp();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!isLoading) {
-      if (identity.setupComplete) {
-        // El modal de video se maneja ahora en el tabs/_layout.tsx
-        router.replace('/(tabs)/dashboard');
-      } else {
+      if (!isAuthenticated) {
+        router.replace('/auth');
+      } else if (!identity.setupComplete) {
         router.replace('/onboarding');
+      } else if (!identity.videoIntroComplete) {
+        router.replace('/video-intro');
+      } else {
+        router.replace('/(tabs)/dashboard');
       }
     }
-  }, [isLoading, identity.setupComplete, router]);
+  }, [identity.setupComplete, identity.videoIntroComplete, isAuthenticated, isLoading, router]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
