@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { LayoutDashboard, ListChecks, Target, BarChart3, Settings } from 'lucide-react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApp } from '@/contexts/AppContext';
@@ -7,18 +7,45 @@ import Colors from '@/constants/colors';
 import DailyVideoModal from '@/components/DailyVideoModal';
 
 export default function TabLayout() {
+  const router = useRouter();
   const { t } = useLanguage();
-  const { shouldShowVideo, getTodayVideo, markVideoAsWatched, skipVideo, videoStreak } = useApp();
+  const {
+    identity,
+    isAuthenticated,
+    isLoading,
+    shouldShowVideo,
+    getTodayVideo,
+    markVideoAsWatched,
+    skipVideo,
+    videoStreak,
+  } = useApp();
   const [showVideoModal, setShowVideoModal] = useState(false);
   const todayVideo = getTodayVideo();
 
-  // Escuchar cambios en shouldShowVideo (cuando se toca la notificación)
   useEffect(() => {
-    if (shouldShowVideo && todayVideo && !todayVideo.watched) {
+    if (isLoading) return;
+
+    if (!isAuthenticated) {
+      router.replace('/auth');
+      return;
+    }
+
+    if (!identity.setupComplete) {
+      router.replace('/onboarding');
+      return;
+    }
+
+    if (!identity.videoIntroComplete) {
+      router.replace('/video-intro');
+    }
+  }, [identity.setupComplete, identity.videoIntroComplete, isAuthenticated, isLoading, router]);
+
+  useEffect(() => {
+    if (isAuthenticated && identity.videoIntroComplete && shouldShowVideo && todayVideo && !todayVideo.watched) {
       console.log('shouldShowVideo changed to true - showing modal');
       setShowVideoModal(true);
     }
-  }, [shouldShowVideo, todayVideo]);
+  }, [identity.videoIntroComplete, isAuthenticated, shouldShowVideo, todayVideo]);
 
   const handleVideoComplete = (videoId: string) => {
     markVideoAsWatched(videoId);
