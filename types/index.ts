@@ -132,6 +132,7 @@ export type UserIdentity = {
   targetIdentity: string;
   whyTransform: string;
   setupComplete: boolean;
+  videoIntroComplete: boolean;
   coreValues: string[];
 };
 
