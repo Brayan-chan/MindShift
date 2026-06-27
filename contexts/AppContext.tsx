@@ -17,7 +17,7 @@ import type {
 import { MOTIVATIONAL_VIDEOS, getRandomVideo } from '@/constants/videos';
 import { getFocusXpForDuration } from '@/constants/focusRewards';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiRequest } from '@/lib/api';
+import { apiRequest, clearAuthToken, getAuthToken } from '@/lib/api';
 
 const STORAGE_KEYS = {
   HABITS: '@apex_habits',
@@ -81,6 +81,7 @@ const DEFAULT_IDENTITY: UserIdentity = {
   targetIdentity: '',
   whyTransform: '',
   setupComplete: false,
+  videoIntroComplete: false,
   coreValues: [],
 };
 
@@ -386,10 +387,31 @@ const parseReminderTime = (time: string) => {
 const HABIT_SYNC_TOAST_ID = 'habit-sync-status';
 const HABIT_SYNC_LOADING_DELAY = 900;
 
+type BootstrapProfile = {
+  currentIdentity?: string | null;
+  targetIdentity?: string | null;
+  whyTransform?: string | null;
+  coreValues?: string[];
+  setupComplete?: boolean;
+  appSettings?: AppSettings;
+};
+
+type BootstrapPayload = {
+  profile?: BootstrapProfile | null;
+  habits?: Habit[];
+  app_state?: Partial<{
+    sessions: FocusSession[];
+    reflections: Reflection[];
+    dailyVideos: DailyVideo[];
+    routineReminders: RoutineReminder[];
+    videoIntroComplete: boolean;
+  }>;
+};
+
 export const [AppProvider, useApp] = createContextHook(() => {
-  const { t, isLoading: isLanguageLoading } = useLanguage();
+  const { t, setLanguage, isLoading: isLanguageLoading } = useLanguage();
   const [identity, setIdentity] = useState<UserIdentity>(DEFAULT_IDENTITY);
-  const [habits, setHabits] = useState<Habit[]>(DEFAULT_HABITS);
+  const [habits, setHabits] = useState<Habit[]>([]);
   const [sessions, setSessions] = useState<FocusSession[]>([]);
   const [reflections, setReflections] = useState<Reflection[]>([]);
   const [dailyVideos, setDailyVideos] = useState<DailyVideo[]>([]);
@@ -399,22 +421,40 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [shouldShowVideo, setShouldShowVideo] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const appState = useRef(AppState.currentState);
   const habitSyncQueue = useRef<Record<string, PendingHabitSync>>({});
   const habitSyncToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const appStateSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dailyVideosRef = useRef<DailyVideo[]>([]);
+  const isAuthenticatedRef = useRef(false);
+  const videoIntroCompleteRef = useRef(false);
+  const isHydratingRemoteRef = useRef(false);
+  const skipNextAppStateSyncRef = useRef(false);
 
-  // Verificar si hay video pendiente
+  useEffect(() => {
+    dailyVideosRef.current = dailyVideos;
+  }, [dailyVideos]);
+
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    videoIntroCompleteRef.current = identity.videoIntroComplete;
+  }, [identity.videoIntroComplete]);
+
   const checkPendingVideo = useCallback(async () => {
     try {
-      const videosData = await AsyncStorage.getItem(STORAGE_KEYS.DAILY_VIDEOS);
+      if (!isAuthenticatedRef.current || !videoIntroCompleteRef.current) return;
+
       const today = getTodayKey();
-      let videos: DailyVideo[] = videosData ? JSON.parse(videosData) : [];
+      let videos: DailyVideo[] = dailyVideosRef.current;
       let todayVideo = videos.find((v: DailyVideo) => v.date === today);
 
       if (!todayVideo) {
         todayVideo = createDailyVideo(today, videos[videos.length - 1]);
         videos = [...videos, todayVideo];
-        await AsyncStorage.setItem(STORAGE_KEYS.DAILY_VIDEOS, JSON.stringify(videos));
         setDailyVideos(videos);
       }
 
@@ -430,15 +470,15 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, []);
 
   useEffect(() => {
-    // Cargar datos y configurar listeners
     loadData();
 
-    // Listener para cuando el usuario interactúa con una notificación (app en foreground/background)
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('📱 Notification response received:', response?.notification?.request?.content?.data);
       try {
-        if (response?.notification?.request?.content?.data?.type === 'daily-video') {
-          console.log('✅ Setting shouldShowVideo to TRUE');
+        if (
+          isAuthenticatedRef.current &&
+          videoIntroCompleteRef.current &&
+          response?.notification?.request?.content?.data?.type === 'daily-video'
+        ) {
           setShouldShowVideo(true);
         }
       } catch (e) {
@@ -446,13 +486,14 @@ export const [AppProvider, useApp] = createContextHook(() => {
       }
     });
 
-    // Si la app fue abierta desde una notificación (cold start), obtener la última respuesta
     (async () => {
       try {
         const lastResponse = await Notifications.getLastNotificationResponseAsync();
-        console.log('🔍 Checking lastNotificationResponse:', lastResponse?.notification?.request?.content?.data);
-        if (lastResponse?.notification?.request?.content?.data?.type === 'daily-video') {
-          console.log('🚀 App opened from notification (cold start) - showing video');
+        if (
+          isAuthenticatedRef.current &&
+          videoIntroCompleteRef.current &&
+          lastResponse?.notification?.request?.content?.data?.type === 'daily-video'
+        ) {
           setShouldShowVideo(true);
         }
       } catch (e) {
@@ -460,16 +501,13 @@ export const [AppProvider, useApp] = createContextHook(() => {
       }
     })();
 
-    // Listener para cuando la app vuelve al foreground (detecta si hay video pendiente)
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        console.log('📲 App has come to the foreground, checking for pending video');
         checkPendingVideo();
       }
       appState.current = nextAppState;
     });
 
-    // Cleanup
     return () => {
       subscription.remove();
       appStateSubscription.remove();
@@ -560,105 +598,187 @@ export const [AppProvider, useApp] = createContextHook(() => {
         if (sync.timer) clearTimeout(sync.timer);
       });
       if (habitSyncToastTimer.current) clearTimeout(habitSyncToastTimer.current);
+      if (appStateSyncTimer.current) clearTimeout(appStateSyncTimer.current);
     };
   }, []);
 
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return;
+    if (isHydratingRemoteRef.current) return;
+    if (skipNextAppStateSyncRef.current) {
+      skipNextAppStateSyncRef.current = false;
+      return;
+    }
+
+    if (appStateSyncTimer.current) {
+      clearTimeout(appStateSyncTimer.current);
+    }
+
+    appStateSyncTimer.current = setTimeout(() => {
+      getAuthToken()
+        .then(token => {
+          if (!token) return null;
+
+          return apiRequest('/me/app-state', {
+            method: 'PUT',
+            body: JSON.stringify({
+              data: {
+                sessions,
+                reflections,
+                dailyVideos,
+                routineReminders,
+                videoIntroComplete: identity.videoIntroComplete,
+              },
+            }),
+          });
+        })
+        .catch(error => {
+          console.log('Could not sync app state:', error);
+        });
+    }, 900);
+  }, [
+    dailyVideos,
+    identity.videoIntroComplete,
+    isAuthenticated,
+    isLoading,
+    reflections,
+    routineReminders,
+    sessions,
+  ]);
+
   const loadData = async () => {
     try {
-      const [
-        identityData,
-        habitsData,
-        sessionsData,
-        reflectionsData,
-        videosData,
-        lastCheckData,
-        remindersData,
-        appSettingsData,
-      ] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.IDENTITY),
-        AsyncStorage.getItem(STORAGE_KEYS.HABITS),
-        AsyncStorage.getItem(STORAGE_KEYS.SESSIONS),
-        AsyncStorage.getItem(STORAGE_KEYS.REFLECTIONS),
-        AsyncStorage.getItem(STORAGE_KEYS.DAILY_VIDEOS),
-        AsyncStorage.getItem(STORAGE_KEYS.LAST_VIDEO_CHECK),
-        AsyncStorage.getItem(STORAGE_KEYS.ROUTINE_REMINDERS),
-        AsyncStorage.getItem(STORAGE_KEYS.APP_SETTINGS),
-      ]);
+      isHydratingRemoteRef.current = true;
+      const authToken = await getAuthToken();
 
-      if (identityData) setIdentity(JSON.parse(identityData));
-      if (appSettingsData) {
-        const mergedSettings = mergeAppSettings(JSON.parse(appSettingsData));
-        setAppSettings(mergedSettings);
-        await AsyncStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(mergedSettings));
-      } else {
-        await AsyncStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(DEFAULT_APP_SETTINGS));
+      if (!authToken) {
+        setIsAuthenticated(false);
+        setIdentity(DEFAULT_IDENTITY);
+        setHabits([]);
+        setSessions([]);
+        setReflections([]);
+        setDailyVideos([]);
+        setRoutineReminders(DEFAULT_ROUTINE_REMINDERS);
+        setAppSettings(DEFAULT_APP_SETTINGS);
+        setShouldShowVideo(false);
+        return;
       }
-      try {
-        const remoteHabits = await apiRequest<Habit[]>('/habits');
-        setHabits(remoteHabits);
-        await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(remoteHabits));
-      } catch (error) {
-        console.log('Using local habits because API is unavailable:', error);
 
-        if (habitsData) {
-          const normalizedHabits = normalizeHabitsForToday(JSON.parse(habitsData));
+      setIsAuthenticated(true);
+      const bootstrap = await apiRequest<BootstrapPayload>('/bootstrap');
 
-          setHabits(normalizedHabits);
-          await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(normalizedHabits));
-        } else {
-          setHabits(DEFAULT_HABITS);
-          await AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(DEFAULT_HABITS));
+      if (bootstrap.profile) {
+        const remoteIdentity: UserIdentity = {
+          currentIdentity: bootstrap.profile.currentIdentity ?? '',
+          targetIdentity: bootstrap.profile.targetIdentity ?? '',
+          whyTransform: bootstrap.profile.whyTransform ?? '',
+          setupComplete: Boolean(bootstrap.profile.setupComplete),
+          videoIntroComplete: Boolean(bootstrap.app_state?.videoIntroComplete),
+          coreValues: bootstrap.profile.coreValues ?? [],
+        };
+        setIdentity(remoteIdentity);
+
+        if (bootstrap.profile.appSettings) {
+          const remoteSettings = mergeAppSettings(bootstrap.profile.appSettings);
+          setAppSettings(remoteSettings);
+          setLanguage(remoteSettings.language).catch(error => {
+            console.log('Could not apply remote language:', error);
+          });
         }
       }
-      if (sessionsData) setSessions(JSON.parse(sessionsData));
-      if (reflectionsData) setReflections(JSON.parse(reflectionsData));
-      if (remindersData) {
-        setRoutineReminders(JSON.parse(remindersData));
-      } else {
-        await AsyncStorage.setItem(
-          STORAGE_KEYS.ROUTINE_REMINDERS,
-          JSON.stringify(DEFAULT_ROUTINE_REMINDERS)
-        );
-      }
-      const today = getTodayKey();
-      const lastCheck = lastCheckData || '';
 
-      // Verificar si hay video pendiente cada vez que se carga la app
-      let videos: DailyVideo[] = videosData ? JSON.parse(videosData) : [];
+      setHabits(bootstrap.habits ?? []);
+      skipNextAppStateSyncRef.current = true;
+      setSessions(bootstrap.app_state?.sessions ?? []);
+      setReflections(bootstrap.app_state?.reflections ?? []);
+      setRoutineReminders(bootstrap.app_state?.routineReminders ?? DEFAULT_ROUTINE_REMINDERS);
+
+      const today = getTodayKey();
+      let videos: DailyVideo[] = bootstrap.app_state?.dailyVideos ?? [];
       let todayVideo = videos.find((v: DailyVideo) => v.date === today);
 
       if (!todayVideo) {
         todayVideo = createDailyVideo(today, videos[videos.length - 1]);
         videos = [...videos, todayVideo];
-        await AsyncStorage.setItem(STORAGE_KEYS.DAILY_VIDEOS, JSON.stringify(videos));
       }
 
       setDailyVideos(videos);
-
-      console.log('📅 Today:', today);
-      console.log('📹 Today video:', todayVideo);
-      console.log('🕐 Last check:', lastCheck);
-
-      // Mostrar video si:
-      // 1. Existe pero no se ha visto
-      // 2. Si no existía, ya se creó y guardó antes de abrir el modal
-      if (!todayVideo.watched) {
-        console.log('📺 Video exists but not watched, will show modal');
-        setShouldShowVideo(true);
-      } else {
-        console.log('✅ Video already watched today');
-        setShouldShowVideo(false);
-      }
+      setShouldShowVideo(Boolean(bootstrap.app_state?.videoIntroComplete) && !todayVideo.watched);
     } catch (error) {
       console.error('Error loading data:', error);
+      await clearAuthToken();
+      setIsAuthenticated(false);
+      setIdentity(DEFAULT_IDENTITY);
+      setHabits([]);
+      setSessions([]);
+      setReflections([]);
+      setDailyVideos([]);
+      setRoutineReminders(DEFAULT_ROUTINE_REMINDERS);
+      setAppSettings(DEFAULT_APP_SETTINGS);
+      setShouldShowVideo(false);
     } finally {
+      setTimeout(() => {
+        isHydratingRemoteRef.current = false;
+      }, 0);
       setIsLoading(false);
     }
   };
 
   const saveIdentity = useCallback(async (newIdentity: UserIdentity) => {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No hay sesión activa.');
+    }
+
+    await apiRequest('/me/identity', {
+      method: 'PATCH',
+      body: JSON.stringify(newIdentity),
+    });
     setIdentity(newIdentity);
-    await AsyncStorage.setItem(STORAGE_KEYS.IDENTITY, JSON.stringify(newIdentity));
+  }, []);
+
+  const completeVideoIntro = useCallback(async () => {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No hay sesión activa.');
+    }
+
+    await apiRequest('/me/app-state', {
+      method: 'PUT',
+      body: JSON.stringify({
+        data: {
+          sessions,
+          reflections,
+          dailyVideos,
+          routineReminders,
+          videoIntroComplete: true,
+        },
+      }),
+    });
+
+    setIdentity(prev => ({
+      ...prev,
+      videoIntroComplete: true,
+    }));
+  }, [dailyVideos, reflections, routineReminders, sessions]);
+
+  const refreshSessionData = useCallback(async () => {
+    setIsLoading(true);
+    await loadData();
+  }, []);
+
+  const logoutSession = useCallback(async () => {
+    await clearAuthToken();
+    await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
+    setIsAuthenticated(false);
+    setIdentity(DEFAULT_IDENTITY);
+    setHabits([]);
+    setSessions([]);
+    setReflections([]);
+    setDailyVideos([]);
+    setRoutineReminders(DEFAULT_ROUTINE_REMINDERS);
+    setAppSettings(DEFAULT_APP_SETTINGS);
+    setShouldShowVideo(false);
   }, []);
 
   const updateAppSettings = useCallback(async (updates: Partial<AppSettings>) => {
@@ -680,13 +800,20 @@ export const [AppProvider, useApp] = createContextHook(() => {
         },
       });
 
-      AsyncStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(next));
+      getAuthToken()
+        .then(token => {
+          if (!token) return null;
+
+          return apiRequest('/me/settings', {
+            method: 'PATCH',
+            body: JSON.stringify({ appSettings: next }),
+          });
+        })
+        .catch(error => {
+          console.log('Could not sync app settings:', error);
+        });
       return next;
     });
-  }, []);
-
-  const persistHabits = useCallback((nextHabits: Habit[]) => {
-    AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(nextHabits));
   }, []);
 
   const flushHabitSync = useCallback(async (habitId: string) => {
@@ -748,14 +875,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
         const today = getTodayKey();
 
         setHabits(prev => {
-          const updated = applyHabitCompletedState(
+          return applyHabitCompletedState(
             prev,
             habitId,
             remoteHabit.completedToday,
             Object.keys(remoteHabit.history)[0] ?? today
           );
-          persistHabits(updated);
-          return updated;
         });
         if (habitSyncToastTimer.current) {
           clearTimeout(habitSyncToastTimer.current);
@@ -802,7 +927,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         }, 300);
       }
     }
-  }, [persistHabits]);
+  }, []);
 
   const queueHabitSync = useCallback((habitId: string, completed: boolean) => {
     const existing = habitSyncQueue.current[habitId];
@@ -829,39 +954,25 @@ export const [AppProvider, useApp] = createContextHook(() => {
     setHabits(prev => {
       const habit = prev.find(item => item.id === habitId);
       nextCompleted = !habit?.completedToday;
-      const updated = applyHabitCompletedState(prev, habitId, nextCompleted);
-      persistHabits(updated);
-      return updated;
+      return applyHabitCompletedState(prev, habitId, nextCompleted);
     });
 
     queueHabitSync(habitId, nextCompleted);
-  }, [persistHabits, queueHabitSync]);
+  }, [queueHabitSync]);
 
   const addHabit = useCallback(async (habit: Omit<Habit, 'id'>) => {
-    let newHabit: Habit;
-
-    try {
-      newHabit = await apiRequest<Habit>('/habits', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: habit.title,
-          type: habit.type,
-          category: habit.category,
-          targetDays: habit.targetDays,
-        }),
-      });
-    } catch (error) {
-      console.log('Creating habit locally because API is unavailable:', error);
-      newHabit = {
-        ...habit,
-        id: Date.now().toString(),
-      };
-    }
+    const newHabit = await apiRequest<Habit>('/habits', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: habit.title,
+        type: habit.type,
+        category: habit.category,
+        targetDays: habit.targetDays,
+      }),
+    });
 
     setHabits(prev => {
-      const updated = [...prev, newHabit];
-      AsyncStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(updated));
-      return updated;
+      return [...prev, newHabit];
     });
   }, []);
 
@@ -875,11 +986,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       type: 'deep-work',
     };
 
-    setSessions(prev => {
-      const updated = [...prev, session];
-      AsyncStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updated));
-      return updated;
-    });
+    setSessions(prev => [...prev, session]);
 
     return session.id;
   }, []);
@@ -901,7 +1008,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
         }
         return session;
       });
-      AsyncStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -914,7 +1020,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
         }
         return session;
       });
-      AsyncStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -930,7 +1035,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
         ? prev.map(item => item.date === reflection.date ? nextReflection : item)
         : [...prev, nextReflection];
 
-      AsyncStorage.setItem(STORAGE_KEYS.REFLECTIONS, JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -957,12 +1061,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
         updated = [...prev, newVideo];
       }
 
-      AsyncStorage.setItem(STORAGE_KEYS.DAILY_VIDEOS, JSON.stringify(updated));
       return updated;
     });
-
-    // Actualizar el último check para evitar mostrar el video nuevamente hoy
-    await AsyncStorage.setItem(STORAGE_KEYS.LAST_VIDEO_CHECK, today);
 
     setShouldShowVideo(false);
     console.log('✅ Video marked as watched, shouldShowVideo set to false');
@@ -991,10 +1091,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
     setRoutineReminders(prev => {
       const updated = prev.map(reminder =>
         reminder.id === reminderId ? { ...reminder, ...updates } : reminder
-      );
-      AsyncStorage.setItem(
-        STORAGE_KEYS.ROUTINE_REMINDERS,
-        JSON.stringify(updated)
       );
       return updated;
     });
@@ -1196,8 +1292,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
     routineReminders,
     appSettings,
     isLoading,
+    isAuthenticated,
     shouldShowVideo,
     saveIdentity,
+    completeVideoIntro,
+    refreshSessionData,
+    logoutSession,
     updateAppSettings,
     toggleHabit,
     addHabit,
@@ -1231,8 +1331,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
     routineReminders,
     appSettings,
     isLoading,
+    isAuthenticated,
     shouldShowVideo,
     saveIdentity,
+    completeVideoIntro,
+    refreshSessionData,
+    logoutSession,
     updateAppSettings,
     toggleHabit,
     addHabit,
