@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Platform } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { X, Play, Pause } from 'lucide-react-native';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Colors from '@/constants/colors';
@@ -24,7 +23,6 @@ type VideoProgress = {
   lastUpdated: number;
 };
 
-const STORAGE_KEY = '@apex_video_progress';
 const PROGRESS_THRESHOLD = 50; // Guardar automáticamente cuando se alcance el 50%
 const AUTO_COMPLETE_THRESHOLD = 90; // Marcar como visto automáticamente al 90%
 
@@ -49,40 +47,13 @@ export default function DailyVideoModal({
   });
 
   const loadProgress = useCallback(async () => {
-    try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      const allProgress: VideoProgress[] = stored ? JSON.parse(stored) : [];
-      const videoProgress = allProgress.find(progress => progress.videoId === videoId);
-
-      setSavedProgress(videoProgress ?? null);
-      hasReachedThreshold.current =
-        (videoProgress?.percentWatched ?? 0) >= PROGRESS_THRESHOLD;
-    } catch (error) {
-      console.error('Error loading video progress:', error);
-    }
-  }, [videoId]);
+    setSavedProgress(null);
+    hasReachedThreshold.current = false;
+  }, []);
 
   const saveProgress = useCallback(async (progress: VideoProgress) => {
-    try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      let allProgress: VideoProgress[] = stored ? JSON.parse(stored) : [];
-      const existingIndex = allProgress.findIndex(item => item.videoId === videoId);
-
-      if (existingIndex >= 0) {
-        allProgress[existingIndex] = progress;
-      } else {
-        allProgress.push(progress);
-      }
-
-      const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-      allProgress = allProgress.filter(item => item.lastUpdated > sevenDaysAgo);
-
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(allProgress));
-      setSavedProgress(progress);
-      onProgressSave?.(videoId, progress.percentWatched);
-    } catch (error) {
-      console.error('Error saving video progress:', error);
-    }
+    setSavedProgress(progress);
+    onProgressSave?.(videoId, progress.percentWatched);
   }, [onProgressSave, videoId]);
 
   useEffect(() => {
@@ -167,18 +138,6 @@ export default function DailyVideoModal({
   };
 
   const handleComplete = async () => {
-    // Limpiar progreso guardado ya que el video se completó
-    try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        let allProgress: VideoProgress[] = JSON.parse(stored);
-        allProgress = allProgress.filter(p => p.videoId !== videoId);
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(allProgress));
-      }
-    } catch (error) {
-      console.error('Error clearing video progress:', error);
-    }
-    
     onComplete(videoId);
   };
 
