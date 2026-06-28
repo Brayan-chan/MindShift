@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   },
   segment: {
     flex: 1,
-    borderRadius: 6,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
