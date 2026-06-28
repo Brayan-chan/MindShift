@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: Colors.dark.surface,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: 16,
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   sectionIcon: {
     width: 40,
     height: 40,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.primary + '18',
     alignItems: 'center',
     justifyContent: 'center',
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   },
   goalSummary: {
     backgroundColor: Colors.dark.background,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: 14,
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
   segmentedControl: {
     flexDirection: 'row',
     backgroundColor: Colors.dark.background,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: 4,
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
   },
   infoPanel: {
     backgroundColor: Colors.dark.background,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: 14,
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   },
   stepper: {
     backgroundColor: Colors.dark.background,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: 14,
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
   stepperButton: {
     width: 44,
     height: 44,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
   },
   testButton: {
     minHeight: 52,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.warning,
     flexDirection: 'row',
     alignItems: 'center',
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     minHeight: 66,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
     borderColor: Colors.dark.danger + '55',
