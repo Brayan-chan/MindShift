@@ -12,12 +12,13 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LockKeyhole, Mail, UserRound, Zap } from 'lucide-react-native';
+import { LockKeyhole, Mail, UserRound } from 'lucide-react-native';
 import { fulltoast } from 'fulltoast';
 import Colors from '@/constants/colors';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApp } from '@/contexts/AppContext';
 import { loginWithPassword, registerWithPassword } from '@/lib/api';
+import AppIconMark from '@/components/AppIconMark';
 
 type AuthMode = 'login' | 'register';
 const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
@@ -77,107 +78,113 @@ export default function AuthScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
     >
       <ScrollView
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={[
           styles.content,
           { paddingTop: insets.top + 38, paddingBottom: insets.bottom + 32 },
         ]}
       >
-        <View style={styles.brandMark}>
-          <Zap size={34} color={Colors.dark.warning} fill={Colors.dark.warning} />
-        </View>
-        <Text style={styles.title}>{t('auth.title')}</Text>
-        <Text style={styles.subtitle}>{t('auth.subtitle')}</Text>
+        <View style={styles.formShell}>
+          <View style={styles.brandSlot}>
+            <AppIconMark size={74} />
+          </View>
+          <Text style={styles.title}>{t('auth.title')}</Text>
+          <Text style={styles.subtitle}>{t('auth.subtitle')}</Text>
 
-        <View style={styles.segmented}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setMode('login')}
-            style={[styles.segment, mode === 'login' && styles.segmentActive]}
-          >
-            <Text style={[styles.segmentText, mode === 'login' && styles.segmentTextActive]}>
-              {t('auth.login')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setMode('register')}
-            style={[styles.segment, mode === 'register' && styles.segmentActive]}
-          >
-            <Text style={[styles.segmentText, mode === 'register' && styles.segmentTextActive]}>
-              {t('auth.register')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.form}>
-          {isRegister ? (
-            <>
-              <AuthField
-                icon={Mail}
-                value={email}
-                onChangeText={setEmail}
-                placeholder={t('auth.email')}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              <AuthField
-                icon={UserRound}
-                value={username}
-                onChangeText={setUsername}
-                placeholder={t('auth.username')}
-                autoCapitalize="none"
-              />
-              <Text style={[
-                styles.fieldHint,
-                username.trim().length > 0 && !isUsernameValid && styles.fieldHintError,
-              ]}>
-                {t('auth.usernameHint')}
+          <View style={styles.segmented}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setMode('login')}
+              style={[styles.segment, mode === 'login' && styles.segmentActive]}
+            >
+              <Text style={[styles.segmentText, mode === 'login' && styles.segmentTextActive]}>
+                {t('auth.login')}
               </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setMode('register')}
+              style={[styles.segment, mode === 'register' && styles.segmentActive]}
+            >
+              <Text style={[styles.segmentText, mode === 'register' && styles.segmentTextActive]}>
+                {t('auth.register')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.form}>
+            {isRegister ? (
+              <>
+                <AuthField
+                  icon={Mail}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder={t('auth.email')}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+                <AuthField
+                  icon={UserRound}
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder={t('auth.username')}
+                  autoCapitalize="none"
+                />
+                <Text style={[
+                  styles.fieldHint,
+                  username.trim().length > 0 && !isUsernameValid && styles.fieldHintError,
+                ]}>
+                  {t('auth.usernameHint')}
+                </Text>
+                <AuthField
+                  icon={UserRound}
+                  value={displayName}
+                  onChangeText={setDisplayName}
+                  placeholder={t('auth.displayName')}
+                />
+              </>
+            ) : (
               <AuthField
                 icon={UserRound}
-                value={displayName}
-                onChangeText={setDisplayName}
-                placeholder={t('auth.displayName')}
+                value={identifier}
+                onChangeText={setIdentifier}
+                placeholder={t('auth.identifier')}
+                autoCapitalize="none"
               />
-            </>
-          ) : (
+            )}
+
             <AuthField
-              icon={UserRound}
-              value={identifier}
-              onChangeText={setIdentifier}
-              placeholder={t('auth.identifier')}
+              icon={LockKeyhole}
+              value={password}
+              onChangeText={setPassword}
+              placeholder={t('auth.password')}
+              secureTextEntry
               autoCapitalize="none"
             />
-          )}
+          </View>
 
-          <AuthField
-            icon={LockKeyhole}
-            value={password}
-            onChangeText={setPassword}
-            placeholder={t('auth.password')}
-            secureTextEntry
-            autoCapitalize="none"
-          />
+          <TouchableOpacity
+            activeOpacity={0.86}
+            disabled={!canSubmit || isSubmitting}
+            onPress={handleSubmit}
+            style={[styles.submitButton, (!canSubmit || isSubmitting) && styles.submitButtonDisabled]}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color={Colors.dark.background} />
+            ) : (
+              <Text style={styles.submitButtonText}>
+                {isRegister ? t('auth.createAccount') : t('auth.enter')}
+              </Text>
+            )}
+          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          activeOpacity={0.86}
-          disabled={!canSubmit || isSubmitting}
-          onPress={handleSubmit}
-          style={[styles.submitButton, (!canSubmit || isSubmitting) && styles.submitButtonDisabled]}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color={Colors.dark.background} />
-          ) : (
-            <Text style={styles.submitButtonText}>
-              {isRegister ? t('auth.createAccount') : t('auth.enter')}
-            </Text>
-          )}
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -229,15 +236,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     justifyContent: 'center',
   },
-  brandMark: {
-    width: 68,
-    height: 68,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
+  formShell: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+  },
+  brandSlot: {
     marginBottom: 22,
   },
   title: {
@@ -256,7 +260,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     flexDirection: 'row',
     padding: 4,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
     borderColor: Colors.dark.border,
@@ -291,7 +295,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
     borderColor: Colors.dark.border,
-    borderRadius: 8,
+    borderRadius: 20,
     paddingHorizontal: 14,
   },
   input: {
@@ -313,7 +317,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     minHeight: 54,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.primary,
     alignItems: 'center',
     justifyContent: 'center',
