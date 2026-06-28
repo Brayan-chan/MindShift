@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   },
   progressPanel: {
     backgroundColor: Colors.dark.surface,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: 18,
