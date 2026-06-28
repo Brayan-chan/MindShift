@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 42,
     height: 42,
-    borderRadius: 8,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     height: 38,
     borderWidth: 1,
     borderColor: Colors.dark.border,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.surface,
     flexDirection: 'row',
     alignItems: 'center',
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
   stepButton: {
     width: 48,
     height: 42,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.dark.surface,
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
   minuteChip: {
     width: 52,
     height: 36,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
     height: 46,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
   confirmButton: {
     flex: 1.4,
     height: 46,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.dark.primary,
