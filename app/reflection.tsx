@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
   backButton: {
     width: 42,
     height: 42,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.dark.surface,
@@ -309,14 +309,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
     borderColor: Colors.dark.border,
-    borderRadius: 8,
+    borderRadius: 20,
     paddingHorizontal: 14,
     marginBottom: 18,
   },
   statusIcon: {
     width: 34,
     height: 34,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.dark.background,
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   },
   textArea: {
     minHeight: 96,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     backgroundColor: Colors.dark.surface,
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   scorePanel: {
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     backgroundColor: Colors.dark.surface,
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
   scoreIcon: {
     width: 34,
     height: 34,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   scoreButton: {
     flex: 1,
     height: 42,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.dark.background,
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     minHeight: 54,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.primary,
     alignItems: 'center',
     justifyContent: 'center',
