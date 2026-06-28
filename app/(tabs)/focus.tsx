@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     backgroundColor: Colors.dark.surface,
-    borderRadius: 8,
+    borderRadius: 20,
     padding: 4,
     marginBottom: 28,
   },
