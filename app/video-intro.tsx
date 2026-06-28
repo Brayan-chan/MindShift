@@ -2,11 +2,12 @@ import { type ComponentType, useState } from 'react';
 import { ActivityIndicator, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { BellRing, CalendarCheck2, PlayCircle } from 'lucide-react-native';
+import { BellRing, CalendarCheck2 } from 'lucide-react-native';
 import { fulltoast } from 'fulltoast';
 import Colors from '@/constants/colors';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApp } from '@/contexts/AppContext';
+import AppIconMark from '@/components/AppIconMark';
 
 export default function VideoIntroScreen() {
   const router = useRouter();
@@ -35,7 +36,7 @@ export default function VideoIntroScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 28, paddingBottom: insets.bottom + 28 }]}>
       <View style={styles.heroIcon}>
-        <PlayCircle size={46} color={Colors.dark.primary} strokeWidth={2.2} />
+        <AppIconMark size={82} />
       </View>
       <Text style={styles.title}>{t('videoIntro.title')}</Text>
       <Text style={styles.subtitle}>{t('videoIntro.subtitle')}</Text>
@@ -102,12 +103,8 @@ const styles = StyleSheet.create({
   heroIcon: {
     width: 82,
     height: 82,
-    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
     marginBottom: 24,
   },
   title: {
@@ -131,7 +128,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.dark.surface,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: 14,
@@ -139,7 +136,7 @@ const styles = StyleSheet.create({
   itemIcon: {
     width: 44,
     height: 44,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -161,7 +158,7 @@ const styles = StyleSheet.create({
   },
   button: {
     minHeight: 54,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.primary,
     alignItems: 'center',
     justifyContent: 'center',
