@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0A0A0A"
     },
     "ios": {
       "supportsTablet": true,
@@ -20,7 +20,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0A0A0A"
       },
       "package": "app.rork.mindshift_c0ksq53",
       "permissions": [
@@ -44,6 +44,7 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/images/notification-icon.png",
           "color": "#0EA5E9",
           "defaultChannel": "default"
         }
