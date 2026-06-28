@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 6,
+    borderRadius: 15,
   },
   segmentActive: {
     backgroundColor: Colors.dark.primary,
