@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   },
   heroPanel: {
     backgroundColor: Colors.dark.surface,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: 18,
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.background,
     borderWidth: 1,
     borderColor: Colors.dark.border,
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
   metricPill: {
     flex: 1,
     minHeight: 64,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.background,
     borderWidth: 1,
     borderColor: Colors.dark.border,
@@ -644,7 +644,7 @@ const styles = StyleSheet.create({
   metricIcon: {
     width: 34,
     height: 34,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 9,
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 26,
   },
   sectionTitle: {
     fontSize: 19,
@@ -684,7 +684,7 @@ const styles = StyleSheet.create({
   },
   chartCard: {
     backgroundColor: Colors.dark.surface,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: 16,
@@ -729,14 +729,14 @@ const styles = StyleSheet.create({
   barTrack: {
     width: '68%',
     height: CHART_HEIGHT - 26,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.primary + '22',
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
   barFill: {
     width: '100%',
-    borderRadius: 8,
+    borderRadius: 20,
   },
   barLabel: {
     marginTop: 8,
@@ -747,7 +747,7 @@ const styles = StyleSheet.create({
   },
   calendarCard: {
     backgroundColor: Colors.dark.surface,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     padding: 15,
@@ -817,7 +817,7 @@ const styles = StyleSheet.create({
   habitLegendPill: {
     maxWidth: 190,
     minHeight: 34,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.background,
     borderWidth: 1,
     borderColor: Colors.dark.border,
@@ -859,14 +859,14 @@ const styles = StyleSheet.create({
   focusTrack: {
     width: '58%',
     height: 116,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.surfaceElevated,
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
   focusFill: {
     width: '100%',
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.primary,
   },
   focusMinutes: {
@@ -899,7 +899,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: '47%',
     minHeight: 88,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
     borderColor: Colors.dark.border,
@@ -928,7 +928,7 @@ const styles = StyleSheet.create({
   },
   videoCard: {
     minHeight: 72,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: Colors.dark.surface,
     borderWidth: 1,
     borderColor: Colors.dark.border,
@@ -939,7 +939,7 @@ const styles = StyleSheet.create({
   videoIcon: {
     width: 42,
     height: 42,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
