@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Tabs, useRouter } from 'expo-router';
 import { LayoutDashboard, ListChecks, Target, BarChart3, Settings } from 'lucide-react-native';
+import { fulltoast } from 'fulltoast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useApp } from '@/contexts/AppContext';
 import Colors from '@/constants/colors';
@@ -47,9 +48,16 @@ export default function TabLayout() {
     }
   }, [identity.videoIntroComplete, isAuthenticated, shouldShowVideo, todayVideo]);
 
-  const handleVideoComplete = (videoId: string) => {
-    markVideoAsWatched(videoId);
-    setShowVideoModal(false);
+  const handleVideoComplete = async (videoId: string) => {
+    try {
+      await markVideoAsWatched(videoId);
+      setShowVideoModal(false);
+    } catch (error) {
+      fulltoast.error({
+        title: t('auth.errorTitle'),
+        description: error instanceof Error ? error.message : t('auth.errorBody'),
+      });
+    }
   };
 
   const handleVideoSkip = () => {
