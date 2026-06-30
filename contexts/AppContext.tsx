@@ -351,6 +351,55 @@ const normalizeHabitsForToday = (rawHabits: Habit[]) => {
   }));
 };
 
+const mergeHabitHistory = (
+  first: Record<string, boolean>,
+  second: Record<string, boolean>
+) => {
+  const dates = new Set([...Object.keys(first), ...Object.keys(second)]);
+
+  return Array.from(dates).reduce<Record<string, boolean>>((acc, date) => {
+    acc[date] = Boolean(first[date] || second[date]);
+    return acc;
+  }, {});
+};
+
+const dedupeRemoteHabits = (rawHabits: Habit[]) => {
+  const habitsByKey = new Map<string, Habit>();
+  const deduped: Habit[] = [];
+
+  rawHabits.forEach((habit) => {
+    const key = habit.legacyId ? `legacy:${habit.legacyId}` : `id:${habit.id}`;
+    const existing = habitsByKey.get(key);
+
+    if (!existing) {
+      habitsByKey.set(key, habit);
+      deduped.push(habit);
+      return;
+    }
+
+    const mergedHistory = mergeHabitHistory(existing.history, habit.history);
+    const existingCompletionCount = Object.values(existing.history).filter(Boolean).length;
+    const currentCompletionCount = Object.values(habit.history).filter(Boolean).length;
+    const preferred = currentCompletionCount > existingCompletionCount ? habit : existing;
+    const mergedHabit: Habit = {
+      ...preferred,
+      history: mergedHistory,
+      completedToday: Boolean(mergedHistory[getTodayKey()]),
+      streak: preferred.type === 'good'
+        ? calculateHabitStreak(mergedHistory)
+        : preferred.streak,
+    };
+    const index = deduped.findIndex(item => item.id === existing.id);
+
+    habitsByKey.set(key, mergedHabit);
+    if (index >= 0) {
+      deduped[index] = mergedHabit;
+    }
+  });
+
+  return deduped;
+};
+
 const getSourceVideoIdFromUrl = (videoUrl?: string) => {
   return MOTIVATIONAL_VIDEOS.find(video => video.url === videoUrl)?.id;
 };
@@ -710,6 +759,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
           videoIntroComplete: Boolean(bootstrap.app_state?.videoIntroComplete),
           coreValues: bootstrap.profile.coreValues ?? [],
         };
+        videoIntroCompleteRef.current = remoteIdentity.videoIntroComplete;
         setIdentity(remoteIdentity);
 
         if (bootstrap.profile.appSettings) {
@@ -721,7 +771,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         }
       }
 
-      setHabits(bootstrap.habits ?? []);
+      setHabits(dedupeRemoteHabits(bootstrap.habits ?? []));
       skipNextAppStateSyncRef.current = true;
       const remoteSessions = bootstrap.app_state?.sessions ?? [];
       const remoteReflections = bootstrap.app_state?.reflections ?? [];
@@ -758,6 +808,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       setRoutineReminders(DEFAULT_ROUTINE_REMINDERS);
       setAppSettings(DEFAULT_APP_SETTINGS);
       setShouldShowVideo(false);
+      videoIntroCompleteRef.current = false;
     } finally {
       setTimeout(() => {
         isHydratingRemoteRef.current = false;
@@ -798,6 +849,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       }),
     });
 
+    videoIntroCompleteRef.current = true;
     setIdentity(prev => ({
       ...prev,
       videoIntroComplete: true,
@@ -821,6 +873,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     setRoutineReminders(DEFAULT_ROUTINE_REMINDERS);
     setAppSettings(DEFAULT_APP_SETTINGS);
     setShouldShowVideo(false);
+    videoIntroCompleteRef.current = false;
   }, []);
 
   const updateAppSettings = useCallback(async (updates: Partial<AppSettings>) => {
@@ -876,6 +929,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
       body: JSON.stringify({
         completed: completedToPersist,
         clientMutationId,
+        localDate: getTodayKey(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Merida',
       }),
     });
 
