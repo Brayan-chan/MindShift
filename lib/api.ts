@@ -32,7 +32,7 @@ const getDefaultApiUrl = () => {
   const hostUri = Constants.expoConfig?.hostUri ?? Constants.manifest2?.extra?.expoClient?.hostUri;
   const host = hostUri?.split(':')[0];
 
-  return host ? `https://mindshift-backend-orcin.vercel.app/api/v1` : 'https://mindshift-backend-orcin.vercel.app/api/v1';
+  return host ? `https://mindshift-backend-phi.vercel.app/api/v1` : 'https://mindshift-backend-phi.vercel.app/api/v1';
 };
 
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? getDefaultApiUrl();
