@@ -426,15 +426,30 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const habitSyncQueue = useRef<Record<string, PendingHabitSync>>({});
   const habitSyncToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const appStateSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionsRef = useRef<FocusSession[]>([]);
+  const reflectionsRef = useRef<Reflection[]>([]);
   const dailyVideosRef = useRef<DailyVideo[]>([]);
+  const routineRemindersRef = useRef<RoutineReminder[]>(DEFAULT_ROUTINE_REMINDERS);
   const isAuthenticatedRef = useRef(false);
   const videoIntroCompleteRef = useRef(false);
   const isHydratingRemoteRef = useRef(false);
   const skipNextAppStateSyncRef = useRef(false);
 
   useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
+
+  useEffect(() => {
+    reflectionsRef.current = reflections;
+  }, [reflections]);
+
+  useEffect(() => {
     dailyVideosRef.current = dailyVideos;
   }, [dailyVideos]);
+
+  useEffect(() => {
+    routineRemindersRef.current = routineReminders;
+  }, [routineReminders]);
 
   useEffect(() => {
     isAuthenticatedRef.current = isAuthenticated;
@@ -467,6 +482,25 @@ export const [AppProvider, useApp] = createContextHook(() => {
     } catch (error) {
       console.error('Error checking pending video:', error);
     }
+  }, []);
+
+  const persistAppStateNow = useCallback(async (overrides?: Partial<BootstrapPayload['app_state']>) => {
+    const token = await getAuthToken();
+    if (!token) return;
+
+    await apiRequest('/me/app-state', {
+      method: 'PUT',
+      body: JSON.stringify({
+        data: {
+          sessions: sessionsRef.current,
+          reflections: reflectionsRef.current,
+          dailyVideos: dailyVideosRef.current,
+          routineReminders: routineRemindersRef.current,
+          videoIntroComplete: videoIntroCompleteRef.current,
+          ...overrides,
+        },
+      }),
+    });
   }, []);
 
   useEffect(() => {
@@ -689,9 +723,16 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
       setHabits(bootstrap.habits ?? []);
       skipNextAppStateSyncRef.current = true;
-      setSessions(bootstrap.app_state?.sessions ?? []);
-      setReflections(bootstrap.app_state?.reflections ?? []);
-      setRoutineReminders(bootstrap.app_state?.routineReminders ?? DEFAULT_ROUTINE_REMINDERS);
+      const remoteSessions = bootstrap.app_state?.sessions ?? [];
+      const remoteReflections = bootstrap.app_state?.reflections ?? [];
+      const remoteRoutineReminders = bootstrap.app_state?.routineReminders ?? DEFAULT_ROUTINE_REMINDERS;
+
+      sessionsRef.current = remoteSessions;
+      reflectionsRef.current = remoteReflections;
+      routineRemindersRef.current = remoteRoutineReminders;
+      setSessions(remoteSessions);
+      setReflections(remoteReflections);
+      setRoutineReminders(remoteRoutineReminders);
 
       const today = getTodayKey();
       let videos: DailyVideo[] = bootstrap.app_state?.dailyVideos ?? [];
@@ -702,6 +743,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         videos = [...videos, todayVideo];
       }
 
+      dailyVideosRef.current = videos;
       setDailyVideos(videos);
       setShouldShowVideo(Boolean(bootstrap.app_state?.videoIntroComplete) && !todayVideo.watched);
     } catch (error) {
@@ -747,10 +789,10 @@ export const [AppProvider, useApp] = createContextHook(() => {
       method: 'PUT',
       body: JSON.stringify({
         data: {
-          sessions,
-          reflections,
-          dailyVideos,
-          routineReminders,
+          sessions: sessionsRef.current,
+          reflections: reflectionsRef.current,
+          dailyVideos: dailyVideosRef.current,
+          routineReminders: routineRemindersRef.current,
           videoIntroComplete: true,
         },
       }),
@@ -760,7 +802,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       ...prev,
       videoIntroComplete: true,
     }));
-  }, [dailyVideos, reflections, routineReminders, sessions]);
+  }, []);
 
   const refreshSessionData = useCallback(async () => {
     setIsLoading(true);
@@ -986,87 +1028,96 @@ export const [AppProvider, useApp] = createContextHook(() => {
       type: 'deep-work',
     };
 
-    setSessions(prev => [...prev, session]);
+    const updated = [...sessionsRef.current, session];
+    sessionsRef.current = updated;
+    setSessions(updated);
+    persistAppStateNow({ sessions: updated }).catch(error => {
+      console.log('Could not persist focus session start:', error);
+    });
 
     return session.id;
-  }, []);
+  }, [persistAppStateNow]);
 
   const endFocusSession = useCallback(async (
     sessionId: string,
     completed: boolean,
     activeDuration?: number
   ) => {
-    setSessions(prev => {
-      const updated = prev.map(session => {
-        if (session.id === sessionId) {
-          return {
-            ...session,
-            endTime: Date.now(),
-            duration: activeDuration ?? Date.now() - session.startTime,
-            completed,
-          };
-        }
-        return session;
-      });
-      return updated;
+    const updated = sessionsRef.current.map(session => {
+      if (session.id === sessionId) {
+        return {
+          ...session,
+          endTime: Date.now(),
+          duration: activeDuration ?? Date.now() - session.startTime,
+          completed,
+        };
+      }
+      return session;
     });
-  }, []);
+
+    sessionsRef.current = updated;
+    setSessions(updated);
+    persistAppStateNow({ sessions: updated }).catch(error => {
+      console.log('Could not persist focus session end:', error);
+    });
+  }, [persistAppStateNow]);
 
   const addDistraction = useCallback(async (sessionId: string) => {
-    setSessions(prev => {
-      const updated = prev.map(session => {
-        if (session.id === sessionId) {
-          return { ...session, distractions: session.distractions + 1 };
-        }
-        return session;
-      });
-      return updated;
+    const updated = sessionsRef.current.map(session => {
+      if (session.id === sessionId) {
+        return { ...session, distractions: session.distractions + 1 };
+      }
+      return session;
     });
-  }, []);
+
+    sessionsRef.current = updated;
+    setSessions(updated);
+    persistAppStateNow({ sessions: updated }).catch(error => {
+      console.log('Could not persist distraction:', error);
+    });
+  }, [persistAppStateNow]);
 
   const saveReflection = useCallback(async (reflection: Omit<Reflection, 'id'>) => {
-    setReflections(prev => {
-      const existingReflection = prev.find(item => item.date === reflection.date);
-      const nextReflection: Reflection = {
-        ...reflection,
-        id: existingReflection?.id ?? Date.now().toString(),
-      };
-      const updated = existingReflection
-        ? prev.map(item => item.date === reflection.date ? nextReflection : item)
-        : [...prev, nextReflection];
+    const existingReflection = reflectionsRef.current.find(item => item.date === reflection.date);
+    const nextReflection: Reflection = {
+      ...reflection,
+      id: existingReflection?.id ?? Date.now().toString(),
+    };
+    const updated = existingReflection
+      ? reflectionsRef.current.map(item => item.date === reflection.date ? nextReflection : item)
+      : [...reflectionsRef.current, nextReflection];
 
-      return updated;
-    });
-  }, []);
+    reflectionsRef.current = updated;
+    setReflections(updated);
+    await persistAppStateNow({ reflections: updated });
+  }, [persistAppStateNow]);
 
   const markVideoAsWatched = useCallback(async (videoId: string) => {
     const today = getTodayKey();
+    const currentVideos = dailyVideosRef.current;
+    const existingVideo = currentVideos.find(v => v.id === videoId) ?? currentVideos.find(v => v.date === today);
+    let updated: DailyVideo[];
 
-    setDailyVideos(prev => {
-      const existingVideo = prev.find(v => v.id === videoId) ?? prev.find(v => v.date === today);
-      let updated: DailyVideo[];
+    if (existingVideo) {
+      updated = currentVideos.map(v =>
+        v.id === existingVideo.id
+          ? { ...v, watched: true, watchedAt: Date.now() }
+          : v
+      );
+    } else {
+      const newVideo: DailyVideo = {
+        ...createDailyVideo(today, currentVideos[currentVideos.length - 1]),
+        watched: true,
+        watchedAt: Date.now(),
+      };
+      updated = [...currentVideos, newVideo];
+    }
 
-      if (existingVideo) {
-        updated = prev.map(v =>
-          v.id === existingVideo.id
-            ? { ...v, watched: true, watchedAt: Date.now() }
-            : v
-        );
-      } else {
-        const newVideo: DailyVideo = {
-          ...createDailyVideo(today, prev[prev.length - 1]),
-          watched: true,
-          watchedAt: Date.now(),
-        };
-        updated = [...prev, newVideo];
-      }
-
-      return updated;
-    });
-
+    dailyVideosRef.current = updated;
+    setDailyVideos(updated);
     setShouldShowVideo(false);
-    console.log('✅ Video marked as watched, shouldShowVideo set to false');
-  }, []);
+    await persistAppStateNow({ dailyVideos: updated });
+  }, [persistAppStateNow]);
 
   const skipVideo = useCallback(async () => {
     console.log('⏭️ User skipped video, closing modal');
@@ -1088,13 +1139,16 @@ export const [AppProvider, useApp] = createContextHook(() => {
     reminderId: RoutineReminderId,
     updates: Partial<Pick<RoutineReminder, 'enabled' | 'time'>>
   ) => {
-    setRoutineReminders(prev => {
-      const updated = prev.map(reminder =>
-        reminder.id === reminderId ? { ...reminder, ...updates } : reminder
-      );
-      return updated;
+    const updated = routineRemindersRef.current.map(reminder =>
+      reminder.id === reminderId ? { ...reminder, ...updates } : reminder
+    );
+
+    routineRemindersRef.current = updated;
+    setRoutineReminders(updated);
+    persistAppStateNow({ routineReminders: updated }).catch(error => {
+      console.log('Could not persist routine reminder:', error);
     });
-  }, []);
+  }, [persistAppStateNow]);
 
   const todayReflection = reflections.find(
     r => r.date === getTodayKey()
