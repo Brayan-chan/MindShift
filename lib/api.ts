@@ -37,20 +37,58 @@ const getDefaultApiUrl = () => {
 
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? getDefaultApiUrl();
 export const AUTH_TOKEN_STORAGE_KEY = '@mindshift_auth_token';
+export const REFRESH_TOKEN_STORAGE_KEY = '@mindshift_refresh_token';
+
+export async function setAuthTokens(accessToken: string, refreshToken?: string) {
+  const entries: [string, string][] = [[AUTH_TOKEN_STORAGE_KEY, accessToken]];
+
+  if (refreshToken) {
+    entries.push([REFRESH_TOKEN_STORAGE_KEY, refreshToken]);
+  }
+
+  await AsyncStorage.multiSet(entries);
+}
 
 export async function setAuthToken(token: string) {
-  await AsyncStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  await setAuthTokens(token);
 }
 
 export async function clearAuthToken() {
-  await AsyncStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  await AsyncStorage.multiRemove([AUTH_TOKEN_STORAGE_KEY, REFRESH_TOKEN_STORAGE_KEY]);
 }
 
 export async function getAuthToken() {
   return AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
 }
 
-export async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
+export async function getRefreshToken() {
+  return AsyncStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+}
+
+async function refreshAuthSession() {
+  const refreshToken = await getRefreshToken();
+  if (!refreshToken) return false;
+
+  const response = await fetch(`${API_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken }),
+  });
+  const payload = (await response.json()) as ApiResponse<AuthResponse>;
+
+  if (!response.ok || payload.error || !payload.data.session?.access_token) {
+    await clearAuthToken();
+    return false;
+  }
+
+  await setAuthTokens(
+    payload.data.session.access_token,
+    payload.data.session.refresh_token ?? refreshToken
+  );
+  return true;
+}
+
+async function requestWithAuth<T>(path: string, options?: RequestInit): Promise<Response> {
   const token = await getAuthToken();
   const headers = new Headers(options?.headers);
   headers.set('Content-Type', 'application/json');
@@ -59,13 +97,34 @@ export async function apiRequest<T>(path: string, options?: RequestInit): Promis
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  return fetch(`${API_URL}${path}`, {
     ...options,
     headers,
   });
+}
+
+export async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  let response = await requestWithAuth<T>(path, options);
   const payload = (await response.json()) as ApiResponse<T>;
 
   if (!response.ok || payload.error) {
+    const shouldRefresh =
+      response.status === 401 &&
+      path !== '/auth/login' &&
+      path !== '/auth/register' &&
+      path !== '/auth/refresh';
+
+    if (shouldRefresh && await refreshAuthSession()) {
+      response = await requestWithAuth<T>(path, options);
+      const retryPayload = (await response.json()) as ApiResponse<T>;
+
+      if (!response.ok || retryPayload.error) {
+        throw new Error(retryPayload.error?.message ?? `API request failed with ${response.status}`);
+      }
+
+      return retryPayload.data;
+    }
+
     throw new Error(payload.error?.message ?? `API request failed with ${response.status}`);
   }
 
@@ -79,7 +138,7 @@ export async function loginWithPassword(identifier: string, password: string) {
   });
 
   if (data.session?.access_token) {
-    await setAuthToken(data.session.access_token);
+    await setAuthTokens(data.session.access_token, data.session.refresh_token);
   }
 
   return data;
