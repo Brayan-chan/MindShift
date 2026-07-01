@@ -22,12 +22,17 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0A0A0A"
       },
+      "softwareKeyboardLayoutMode": "resize",
       "package": "app.rork.mindshift_c0ksq53",
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.SCHEDULE_EXACT_ALARM",
         "RECORD_AUDIO"
       ]
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#0A0A0A",
+      "barStyle": "light-content"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
