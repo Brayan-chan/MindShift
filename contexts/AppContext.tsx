@@ -13,6 +13,7 @@ import type {
   RoutineReminder,
   RoutineReminderId,
   AppSettings,
+  UserProfile,
 } from '@/types';
 import { MOTIVATIONAL_VIDEOS, getRandomVideo } from '@/constants/videos';
 import { getFocusXpForDuration } from '@/constants/focusRewards';
@@ -56,6 +57,9 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
     defaultDuration: 25,
     breakDuration: 5,
     longBreakAfter: 4,
+    strictModeEnabled: true,
+    strictPin: '1234',
+    exitPenalty: 10,
   },
 };
 
@@ -437,6 +441,10 @@ const HABIT_SYNC_TOAST_ID = 'habit-sync-status';
 const HABIT_SYNC_LOADING_DELAY = 900;
 
 type BootstrapProfile = {
+  id?: string;
+  email?: string | null;
+  username?: string | null;
+  displayName?: string | null;
   currentIdentity?: string | null;
   targetIdentity?: string | null;
   whyTransform?: string | null;
@@ -460,6 +468,7 @@ type BootstrapPayload = {
 export const [AppProvider, useApp] = createContextHook(() => {
   const { t, setLanguage, isLoading: isLanguageLoading } = useLanguage();
   const [identity, setIdentity] = useState<UserIdentity>(DEFAULT_IDENTITY);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [sessions, setSessions] = useState<FocusSession[]>([]);
   const [reflections, setReflections] = useState<Reflection[]>([]);
@@ -736,6 +745,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
       if (!authToken) {
         setIsAuthenticated(false);
+        setProfile(null);
         setIdentity(DEFAULT_IDENTITY);
         setHabits([]);
         setSessions([]);
@@ -751,6 +761,13 @@ export const [AppProvider, useApp] = createContextHook(() => {
       const bootstrap = await apiRequest<BootstrapPayload>('/bootstrap');
 
       if (bootstrap.profile) {
+        setProfile({
+          id: bootstrap.profile.id,
+          email: bootstrap.profile.email,
+          username: bootstrap.profile.username,
+          displayName: bootstrap.profile.displayName,
+        });
+
         const remoteIdentity: UserIdentity = {
           currentIdentity: bootstrap.profile.currentIdentity ?? '',
           targetIdentity: bootstrap.profile.targetIdentity ?? '',
@@ -800,6 +817,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       console.error('Error loading data:', error);
       await clearAuthToken();
       setIsAuthenticated(false);
+      setProfile(null);
       setIdentity(DEFAULT_IDENTITY);
       setHabits([]);
       setSessions([]);
@@ -865,6 +883,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     await clearAuthToken();
     await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
     setIsAuthenticated(false);
+    setProfile(null);
     setIdentity(DEFAULT_IDENTITY);
     setHabits([]);
     setSessions([]);
@@ -874,6 +893,15 @@ export const [AppProvider, useApp] = createContextHook(() => {
     setAppSettings(DEFAULT_APP_SETTINGS);
     setShouldShowVideo(false);
     videoIntroCompleteRef.current = false;
+  }, []);
+
+  const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
+    const updatedProfile = await apiRequest<UserProfile>('/me/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+    setProfile(updatedProfile);
+    return updatedProfile;
   }, []);
 
   const updateAppSettings = useCallback(async (updates: Partial<AppSettings>) => {
@@ -1242,6 +1270,17 @@ export const [AppProvider, useApp] = createContextHook(() => {
         xpByDate[date] = (xpByDate[date] || 0) + getFocusXpForDuration(session.duration);
       });
 
+    if (appSettings.gamification.sanctionsEnabled) {
+      sessions
+        .filter(session => session.distractions > 0)
+        .forEach(session => {
+          const date = getDateKey(new Date(session.startTime));
+          xpByDate[date] = (xpByDate[date] || 0) - (
+            session.distractions * appSettings.focusMode.exitPenalty
+          );
+        });
+    }
+
     dailyVideos
       .filter(video => video.watched)
       .forEach(video => {
@@ -1252,6 +1291,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, [
     appSettings.gamification.badHabitPenalty,
     appSettings.gamification.sanctionsEnabled,
+    appSettings.focusMode.exitPenalty,
     dailyVideos,
     habits,
     sessions,
@@ -1293,7 +1333,13 @@ export const [AppProvider, useApp] = createContextHook(() => {
         return sum + completions * appSettings.gamification.badHabitPenalty;
       }, 0)
     : 0;
-  const totalPenaltyXp = missedGoalPenaltyXp + badHabitPenaltyXp;
+  const focusExitPenaltyXp = appSettings.gamification.sanctionsEnabled
+    ? sessions.reduce(
+      (sum, session) => sum + (session.distractions * appSettings.focusMode.exitPenalty),
+      0
+    )
+    : 0;
+  const totalPenaltyXp = missedGoalPenaltyXp + badHabitPenaltyXp + focusExitPenaltyXp;
 
   const todayXp = dailyXpByDate[getTodayKey()] || 0;
   const totalXp = Math.max(
@@ -1394,6 +1440,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   return useMemo(() => ({
     identity,
+    profile,
     habits,
     sessions,
     reflections,
@@ -1407,6 +1454,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     completeVideoIntro,
     refreshSessionData,
     logoutSession,
+    updateProfile,
     updateAppSettings,
     toggleHabit,
     addHabit,
@@ -1433,6 +1481,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     weeklyActivity,
   }), [
     identity,
+    profile,
     habits,
     sessions,
     reflections,
@@ -1446,6 +1495,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     completeVideoIntro,
     refreshSessionData,
     logoutSession,
+    updateProfile,
     updateAppSettings,
     toggleHabit,
     addHabit,
