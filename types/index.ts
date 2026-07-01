@@ -127,6 +127,13 @@ export type GamificationSettings = {
   missedGoalPenalty: number;
 };
 
+export type UserProfile = {
+  id?: string;
+  email?: string | null;
+  username?: string | null;
+  displayName?: string | null;
+};
+
 export type UserIdentity = {
   currentIdentity: string;
   targetIdentity: string;
@@ -150,5 +157,8 @@ export type AppSettings = {
     defaultDuration: number;
     breakDuration: number;
     longBreakAfter: number;
+    strictModeEnabled: boolean;
+    strictPin: string;
+    exitPenalty: number;
   };
 };
