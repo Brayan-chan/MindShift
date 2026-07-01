@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Tabs, useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { LayoutDashboard, ListChecks, Target, BarChart3, Settings } from 'lucide-react-native';
 import { fulltoast } from 'fulltoast';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -47,6 +48,28 @@ export default function TabLayout() {
       setShowVideoModal(true);
     }
   }, [identity.videoIntroComplete, isAuthenticated, shouldShowVideo, todayVideo]);
+
+  useEffect(() => {
+    const openFocusFromNotification = (notification: Notifications.Notification) => {
+      if (notification.request.content.data?.type === 'focus-session') {
+        router.push('/(tabs)/focus');
+      }
+    };
+
+    const lastResponse = Notifications.getLastNotificationResponse();
+    if (lastResponse?.notification) {
+      openFocusFromNotification(lastResponse.notification);
+      Notifications.clearLastNotificationResponse();
+    }
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      openFocusFromNotification(response.notification);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [router]);
 
   const handleVideoComplete = async (videoId: string) => {
     try {
