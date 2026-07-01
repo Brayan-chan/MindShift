@@ -1,7 +1,10 @@
-import { type ComponentType, useState } from 'react';
+import { type ComponentType, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  InteractionManager,
+  Keyboard,
   KeyboardAvoidingView,
+  type LayoutChangeEvent,
   Platform,
   ScrollView,
   StyleSheet,
@@ -35,6 +38,10 @@ export default function AuthScreen() {
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const fieldOffsetsRef = useRef<Record<string, number>>({});
+  const focusedFieldRef = useRef<string | null>(null);
 
   const isRegister = mode === 'register';
   const normalizedUsername = username.trim().toLowerCase();
@@ -45,6 +52,60 @@ export default function AuthScreen() {
   const canSubmit = isRegister
     ? email.trim().includes('@') && isUsernameValid && password.length >= 8
     : identifier.trim().length >= 3 && password.length >= 8;
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') return;
+
+    const showSubscription = Keyboard.addListener('keyboardDidShow', event => {
+      setKeyboardHeight(event.endCoordinates.height);
+      if (focusedFieldRef.current) {
+        smoothScrollToField(focusedFieldRef.current, 120);
+      }
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+      focusedFieldRef.current = null;
+      smoothScrollToTop();
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  const registerFieldOffset = (field: string, event: LayoutChangeEvent) => {
+    fieldOffsetsRef.current[field] = event.nativeEvent.layout.y;
+  };
+
+  const smoothScrollToTop = () => {
+    requestAnimationFrame(() => {
+      InteractionManager.runAfterInteractions(() => {
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      });
+    });
+  };
+
+  const smoothScrollToField = (field: string, delay = 80) => {
+    if (Platform.OS === 'ios') return;
+
+    window.setTimeout(() => {
+      const y = fieldOffsetsRef.current[field] ?? 0;
+      requestAnimationFrame(() => {
+        InteractionManager.runAfterInteractions(() => {
+          scrollViewRef.current?.scrollTo({
+            y: Math.max(0, y - 104),
+            animated: true,
+          });
+        });
+      });
+    }, delay);
+  };
+
+  const handleFieldFocus = (field: string) => {
+    focusedFieldRef.current = field;
+    smoothScrollToField(field);
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit || isSubmitting) return;
@@ -78,17 +139,27 @@ export default function AuthScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
     >
       <ScrollView
+        ref={scrollViewRef}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         showsVerticalScrollIndicator={false}
-        automaticallyAdjustKeyboardInsets
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
+        overScrollMode="never"
+        decelerationRate="normal"
+        scrollEventThrottle={16}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + 38, paddingBottom: insets.bottom + 32 },
+          keyboardHeight > 0 && styles.contentKeyboardOpen,
+          {
+            paddingTop: insets.top + 38,
+            paddingBottom: insets.bottom + 32 + keyboardHeight,
+          },
         ]}
       >
         <View style={styles.formShell}>
@@ -123,19 +194,25 @@ export default function AuthScreen() {
             {isRegister ? (
               <>
                 <AuthField
+                  fieldKey="email"
                   icon={Mail}
                   value={email}
                   onChangeText={setEmail}
                   placeholder={t('auth.email')}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  onFocus={() => handleFieldFocus('email')}
+                  onLayout={event => registerFieldOffset('email', event)}
                 />
                 <AuthField
+                  fieldKey="username"
                   icon={UserRound}
                   value={username}
                   onChangeText={setUsername}
                   placeholder={t('auth.username')}
                   autoCapitalize="none"
+                  onFocus={() => handleFieldFocus('username')}
+                  onLayout={event => registerFieldOffset('username', event)}
                 />
                 <Text style={[
                   styles.fieldHint,
@@ -144,29 +221,38 @@ export default function AuthScreen() {
                   {t('auth.usernameHint')}
                 </Text>
                 <AuthField
+                  fieldKey="displayName"
                   icon={UserRound}
                   value={displayName}
                   onChangeText={setDisplayName}
                   placeholder={t('auth.displayName')}
+                  onFocus={() => handleFieldFocus('displayName')}
+                  onLayout={event => registerFieldOffset('displayName', event)}
                 />
               </>
             ) : (
               <AuthField
+                fieldKey="identifier"
                 icon={UserRound}
                 value={identifier}
                 onChangeText={setIdentifier}
                 placeholder={t('auth.identifier')}
                 autoCapitalize="none"
+                onFocus={() => handleFieldFocus('identifier')}
+                onLayout={event => registerFieldOffset('identifier', event)}
               />
             )}
 
             <AuthField
+              fieldKey="password"
               icon={LockKeyhole}
               value={password}
               onChangeText={setPassword}
               placeholder={t('auth.password')}
               secureTextEntry
               autoCapitalize="none"
+              onFocus={() => handleFieldFocus('password')}
+              onLayout={event => registerFieldOffset('password', event)}
             />
           </View>
 
@@ -191,6 +277,7 @@ export default function AuthScreen() {
 }
 
 type AuthFieldProps = {
+  fieldKey: string;
   icon: ComponentType<{ size: number; color: string; strokeWidth?: number }>;
   value: string;
   onChangeText: (value: string) => void;
@@ -198,9 +285,12 @@ type AuthFieldProps = {
   keyboardType?: 'default' | 'email-address';
   secureTextEntry?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  onFocus?: () => void;
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
 function AuthField({
+  fieldKey,
   icon: Icon,
   value,
   onChangeText,
@@ -208,13 +298,17 @@ function AuthField({
   keyboardType = 'default',
   secureTextEntry,
   autoCapitalize,
+  onFocus,
+  onLayout,
 }: AuthFieldProps) {
   return (
-    <View style={styles.inputWrap}>
+    <View style={styles.inputWrap} onLayout={onLayout}>
       <Icon size={20} color={Colors.dark.textSecondary} strokeWidth={2.2} />
       <TextInput
+        nativeID={fieldKey}
         value={value}
         onChangeText={onChangeText}
+        onFocus={onFocus}
         placeholder={placeholder}
         placeholderTextColor={Colors.dark.textTertiary}
         keyboardType={keyboardType}
@@ -235,6 +329,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 22,
     justifyContent: 'center',
+  },
+  contentKeyboardOpen: {
+    justifyContent: 'flex-start',
   },
   formShell: {
     width: '100%',
