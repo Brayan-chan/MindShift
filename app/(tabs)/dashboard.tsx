@@ -113,7 +113,10 @@ export default function DashboardScreen() {
           </View>
           <View style={styles.totalXp}>
             <Trophy size={18} color={Colors.dark.primary} />
-            <Text style={styles.totalXpText}>{totalXp} XP</Text>
+            <View style={styles.totalXpCopy}>
+              <Text style={styles.totalXpText}>{totalXp} XP</Text>
+              <Text style={styles.totalXpLabel}>{t('gamification.totalXp')}</Text>
+            </View>
           </View>
         </View>
 
@@ -319,12 +322,22 @@ const styles = StyleSheet.create({
   totalXp: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 8,
+  },
+  totalXpCopy: {
+    alignItems: 'flex-end',
   },
   totalXpText: {
     fontSize: 13,
     fontWeight: '700',
     color: Colors.dark.primary,
+  },
+  totalXpLabel: {
+    marginTop: 1,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: '700',
+    color: Colors.dark.textTertiary,
   },
   weekTitle: {
     fontSize: 12,
