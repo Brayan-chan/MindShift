@@ -1,8 +1,22 @@
-import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
-import { Bell, LogOut, Minus, Plus, ShieldAlert, SlidersHorizontal, Target, Zap } from 'lucide-react-native';
+import {
+  AtSign,
+  Bell,
+  KeyRound,
+  LogOut,
+  Mail,
+  Minus,
+  Plus,
+  ShieldAlert,
+  SlidersHorizontal,
+  Target,
+  User,
+  Zap,
+} from 'lucide-react-native';
 import { fulltoast } from 'fulltoast';
 import { useApp } from '@/contexts/AppContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -16,7 +30,9 @@ export default function SettingsScreen() {
   const router = useRouter();
   const {
     appSettings,
+    profile,
     updateAppSettings,
+    updateProfile,
     dailyXpGoal,
     autoDailyXpGoal,
     totalPenaltyXp,
@@ -25,6 +41,12 @@ export default function SettingsScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { gamification } = appSettings;
+  const { focusMode } = appSettings;
+  const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
+
+  useEffect(() => {
+    setDisplayName(profile?.displayName ?? '');
+  }, [profile?.displayName]);
 
   const updateGamification = (updates: Partial<typeof gamification>) => {
     updateAppSettings({
@@ -33,6 +55,30 @@ export default function SettingsScreen() {
         ...updates,
       },
     });
+  };
+
+  const updateFocusMode = (updates: Partial<typeof focusMode>) => {
+    updateAppSettings({
+      focusMode: {
+        ...focusMode,
+        ...updates,
+      },
+    });
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      await updateProfile({ displayName: displayName.trim() });
+      fulltoast.success({
+        title: t('settings.profileSaved'),
+        description: t('settings.profileSavedBody'),
+      });
+    } catch (error) {
+      fulltoast.error({
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
   };
 
   const testNotification = async () => {
@@ -84,6 +130,12 @@ export default function SettingsScreen() {
     });
   };
 
+  const setExitPenalty = (nextPenalty: number) => {
+    updateFocusMode({
+      exitPenalty: clamp(nextPenalty, 0, 50),
+    });
+  };
+
   const handleLogout = async () => {
     await logoutSession();
     router.replace('/auth');
@@ -97,6 +149,53 @@ export default function SettingsScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>{t('settings.title')}</Text>
         <Text style={styles.subtitle}>{t('settings.subtitle')}</Text>
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionIcon}>
+            <User size={20} color={Colors.dark.primary} />
+          </View>
+          <View style={styles.sectionCopy}>
+            <Text style={styles.sectionTitle}>{t('settings.profileTitle')}</Text>
+            <Text style={styles.sectionDescription}>{t('settings.profileDescription')}</Text>
+          </View>
+        </View>
+
+        <TextInput
+          value={displayName}
+          onChangeText={setDisplayName}
+          placeholder={t('auth.displayName')}
+          placeholderTextColor={Colors.dark.textTertiary}
+          style={styles.textInput}
+        />
+
+        <View style={styles.accountRows}>
+          <View style={styles.accountRow}>
+            <Mail size={18} color={Colors.dark.textTertiary} />
+            <Text style={styles.accountText} numberOfLines={1}>
+              {profile?.email ?? t('settings.noEmail')}
+            </Text>
+          </View>
+          <View style={styles.accountRow}>
+            <AtSign size={18} color={Colors.dark.textTertiary} />
+            <Text style={styles.accountText} numberOfLines={1}>
+              {profile?.username ? `@${profile.username}` : t('settings.noUsername')}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          activeOpacity={0.86}
+          style={[
+            styles.saveProfileButton,
+            displayName.trim().length === 0 && styles.saveProfileButtonDisabled,
+          ]}
+          onPress={handleSaveProfile}
+          disabled={displayName.trim().length === 0}
+        >
+          <Text style={styles.saveProfileText}>{t('common.save')}</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
@@ -176,6 +275,47 @@ export default function SettingsScreen() {
             onIncrease={() => setManualGoal(gamification.manualDailyXpGoal + 10)}
           />
         )}
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <View style={[styles.sectionIcon, styles.warningIcon]}>
+            <ShieldAlert size={20} color={Colors.dark.warning} />
+          </View>
+          <View style={styles.sectionCopy}>
+            <Text style={styles.sectionTitle}>{t('settings.strictFocusTitle')}</Text>
+            <Text style={styles.sectionDescription}>{t('settings.strictFocusDescription')}</Text>
+          </View>
+          <Switch
+            value={focusMode.strictModeEnabled}
+            onValueChange={value => updateFocusMode({ strictModeEnabled: value })}
+            thumbColor={Colors.dark.text}
+            trackColor={{ false: Colors.dark.border, true: Colors.dark.warning }}
+          />
+        </View>
+
+        <View style={styles.pinRow}>
+          <View style={styles.pinIcon}>
+            <KeyRound size={18} color={Colors.dark.warning} />
+          </View>
+          <TextInput
+            value={focusMode.strictPin}
+            onChangeText={value => updateFocusMode({ strictPin: value.replace(/\D/g, '').slice(0, 8) })}
+            placeholder="1234"
+            placeholderTextColor={Colors.dark.textTertiary}
+            keyboardType="number-pad"
+            secureTextEntry
+            style={styles.pinInput}
+          />
+        </View>
+
+        <Stepper
+          label={t('settings.exitPenalty')}
+          value={focusMode.exitPenalty}
+          suffix="XP"
+          onDecrease={() => setExitPenalty(focusMode.exitPenalty - 5)}
+          onIncrease={() => setExitPenalty(focusMode.exitPenalty + 5)}
+        />
       </View>
 
       <View style={styles.section}>
@@ -343,6 +483,54 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 3,
   },
+  textInput: {
+    minHeight: 54,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    backgroundColor: Colors.dark.background,
+    color: Colors.dark.text,
+    fontSize: 16,
+    fontWeight: '700',
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  accountRows: {
+    gap: 8,
+  },
+  accountRow: {
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.dark.background,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+  },
+  accountText: {
+    flex: 1,
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  saveProfileButton: {
+    minHeight: 48,
+    borderRadius: 16,
+    backgroundColor: Colors.dark.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  saveProfileButtonDisabled: {
+    opacity: 0.45,
+  },
+  saveProfileText: {
+    color: Colors.dark.background,
+    fontSize: 15,
+    fontWeight: '800',
+  },
   goalSummary: {
     backgroundColor: Colors.dark.background,
     borderRadius: 20,
@@ -460,6 +648,34 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
     fontSize: 12,
     fontWeight: '700',
+  },
+  pinRow: {
+    minHeight: 56,
+    borderRadius: 18,
+    backgroundColor: Colors.dark.background,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    marginTop: 2,
+  },
+  pinIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: Colors.dark.warning + '18',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pinInput: {
+    flex: 1,
+    minHeight: 52,
+    color: Colors.dark.text,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 4,
   },
   testButton: {
     minHeight: 52,
